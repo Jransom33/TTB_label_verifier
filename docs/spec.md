@@ -22,33 +22,7 @@ Still unconfirmed: authoritative warning text and visual warning rules, confiden
 
 ## Component list
 
-### 1. API routes — complete for the single-item prototype
-
-Done:
-
-- Next.js App Router project with TypeScript, ESLint, and Vitest.
-- `GET /api/health` returns `{ data: { status: "ok" }, requestId }`.
-- `POST /api/verifications` parses the upload, assigns a request ID, calls `verifyLabel` once, and returns the structured result or a sanitized error.
-- Routes stay limited to HTTP: parse, request ID, service call, error mapping.
-- Endpoint contracts documented in `README.md`.
-
-Remaining:
-
-- Batch routes, after the workflow is confirmed.
-
-### 2. Request validation and upload guard — complete
-
-Done:
-
-- Zod application-data schema with required/optional fields, trimming, blank rejection, and length limits.
-- `beverageType` is one of `beer`, `wine`, or `distilled_spirits`.
-- Exactly one `image` and one `applicationData` field.
-- `.png` / `.jpg` / `.jpeg` only, with matching MIME type and PNG/JPEG magic bytes.
-- Full PNG/JPEG decode after the signature check; truncated or corrupt files are `INVALID_REQUEST`. Pixel count is capped at 25 megapixels.
-- Configurable `MAX_IMAGE_BYTES` and `MAX_REQUEST_BYTES`; the body is read with a size cap before parsing.
-- Malformed or unsafe input is rejected before the verification service (and later AI provider).
-
-### 3. Domain types and verification rules — started
+### 1. Domain types and verification rules — started
 
 Done:
 
@@ -64,19 +38,19 @@ Remaining:
 - Confidence thresholds and whether confidence is 0–1 or 0–100.
 - Whether image-quality issues should be structured objects instead of strings.
 
+### 2. Field normalizers — not started
+
+Remaining: comparison-only normalization for capitalization/whitespace/punctuation, ABV/proof and volume conversion, and exact warning-text handling.
+
+### 3. Comparison and decision engine — not started
+
+Remaining: field comparison, warning heading checks, and deriving `pass` / `fail` / `needs_review`.
+
 ### 4. Label analyzer — not started
 
 Remaining: provider-neutral extraction interface, fake and real adapters, structured output validation, prompt isolation, timeouts, and bounded retries.
 
-### 5. Field normalizers — not started
-
-Remaining: comparison-only normalization for capitalization/whitespace/punctuation, ABV/proof and volume conversion, and exact warning-text handling.
-
-### 6. Comparison and decision engine — not started
-
-Remaining: field comparison, warning heading checks, and deriving `pass` / `fail` / `needs_review`.
-
-### 7. Verification service — stub only
+### 5. Verification service — stub only
 
 Done:
 
@@ -88,11 +62,33 @@ Remaining:
 - Orchestrate analysis, normalization, and comparison.
 - Until those exist, every supplied label field is `unreadable` and the outcome is `needs_review`. The image is accepted but not inspected. Government warning is not checked yet.
 
-### 8. Batch coordinator — not started
+### 6. Request validation and upload guard — complete
 
-Remaining: bounded concurrency for up to 300 items, per-item isolation, progress/summary, and idempotent retries. Execution model is still unconfirmed.
+Done:
 
-### 9. Error handling and observability — error mapping complete; telemetry not started
+- Zod application-data schema with required/optional fields, trimming, blank rejection, and length limits.
+- `beverageType` is one of `beer`, `wine`, or `distilled_spirits`.
+- Exactly one `image` and one `applicationData` field.
+- `.png` / `.jpg` / `.jpeg` only, with matching MIME type and PNG/JPEG magic bytes.
+- Full PNG/JPEG decode after the signature check; truncated or corrupt files are `INVALID_REQUEST`. Pixel count is capped at 25 megapixels.
+- Configurable `MAX_IMAGE_BYTES` and `MAX_REQUEST_BYTES`; the body is read with a size cap before parsing.
+- Malformed or unsafe input is rejected before the verification service (and later AI provider).
+
+### 7. API routes — complete for the single-item prototype
+
+Done:
+
+- Next.js App Router project with TypeScript, ESLint, and Vitest.
+- `GET /api/health` returns `{ data: { status: "ok" }, requestId }`.
+- `POST /api/verifications` parses the upload, assigns a request ID, calls `verifyLabel` once, and returns the structured result or a sanitized error.
+- Routes stay limited to HTTP: parse, request ID, service call, error mapping.
+- Endpoint contracts documented in `README.md`.
+
+Remaining:
+
+- Batch routes, after the workflow is confirmed.
+
+### 8. Error handling and observability — error mapping complete; telemetry not started
 
 Done:
 
@@ -104,6 +100,10 @@ Remaining:
 
 - Sanitized logs for latency, outcome counts, and diagnostics.
 - Do not log images, full application data, secrets, or raw provider payloads.
+
+### 9. Batch coordinator — not started
+
+Remaining: bounded concurrency for up to 300 items, per-item isolation, progress/summary, and idempotent retries. Execution model is still unconfirmed.
 
 ### 10. Automated tests — route tests complete; unit/service/batch tests not started
 
