@@ -1,0 +1,14 @@
+# Dependencies and generated output
+/node_modules
+/.next
+/coverage
+
+# Local configuration and logs
+.env*
+!.env.example
+*.log
+
+# Editor and operating-system files
+.DS_Store
+*.tsbuildinfo
+node_modules

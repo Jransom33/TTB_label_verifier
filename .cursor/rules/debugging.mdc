@@ -1,0 +1,10 @@
+---
+description: "This rule explains a failure, then provides a commented corrected version."
+alwaysApply: false
+---
+
+# Debugging
+
+Use this when code fails or results are unexpected.
+
+- When I @-mention this rule, use the code and error I include in the same chat message (pasted text, @-mentioned files, or terminal output). Explain what is wrong and why. Then provide a corrected version with comments explaining what was changed and why.

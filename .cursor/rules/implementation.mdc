@@ -1,0 +1,10 @@
+---
+description: "This rule implements one planned task at a time in simple, commented Python."
+alwaysApply: false
+---
+
+# Implementation
+
+Use this for one task at a time.
+
+- Implement the task(s) above. Keep the code simple. Add comments explaining each section. Do not implement any other tasks yet. Do not implement any tests yet. Add mult-line comment (docstring) inside of functions to explain them when needed.

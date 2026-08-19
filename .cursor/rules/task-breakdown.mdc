@@ -1,0 +1,10 @@
+---
+description: "This rule breaks a planned component into small, single-prompt implementation tasks."
+alwaysApply: false
+---
+
+# Task Breakdown
+
+Use this after you have a plan.
+
+- Here is component from our plan. Break it into individual implementation tasks. Keep each task small enough to implement in a single prompt.

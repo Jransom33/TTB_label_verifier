@@ -1,0 +1,13 @@
+---
+description: "This rule adds post-generation comments identifying assumptions, uncertainties, and incomplete sections."
+alwaysApply: false
+---
+
+# Validation Hook
+
+Use this after AI generates code.
+
+- After generating the code, add inline comments or notes that identify:
+  1. Any assumptions you made that I should verify
+  2. Any parts you are uncertain about
+  3. Any sections that are incomplete or require follow-up

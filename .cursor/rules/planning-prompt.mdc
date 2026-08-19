@@ -1,0 +1,10 @@
+---
+description: "Use this before building a major component."
+alwaysApply: false
+---
+
+# Planning Prompt
+
+- I want to build the major component or feature described in this chat.
+
+- Before writing any code, give me a high-level plan. What components do I need and what should I build first?

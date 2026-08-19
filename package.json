@@ -1,0 +1,39 @@
+{
+  "name": "ttb-label-verifier",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Backend for AI-assisted alcohol label verification.",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint .",
+    "test": "vitest run --passWithNoTests"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Jransom33/TTB_label_verifier.git"
+  },
+  "license": "UNLICENSED",
+  "bugs": {
+    "url": "https://github.com/Jransom33/TTB_label_verifier/issues"
+  },
+  "homepage": "https://github.com/Jransom33/TTB_label_verifier#readme",
+  "dependencies": {
+    "next": "^16.3.1",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "sharp": "^0.35.3",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^26.2.0",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.4",
+    "@vitest/ui": "^4.1.11",
+    "eslint": "^9.39.5",
+    "eslint-config-next": "^16.3.1",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.11"
+  }
+}
