@@ -1,22 +1,20 @@
-/*
- * Assumption: field statuses and outcomes match the documented API contract.
- * Confirm whether confidence is 0-1 or 0-100, and whether image-quality issues
- * stay as strings or become structured objects.
- */
+import type { ConfidenceLevel } from "@/domain/extracted-label";
+import type { VerificationField } from "@/domain/verification-rules";
+
+// These statuses and outcomes form the documented public API contract.
 export type FieldStatus = "match" | "mismatch" | "missing" | "unreadable";
 export type VerificationOutcome = "pass" | "fail" | "needs_review";
 
 export type FieldResult = {
-  field: string;
+  field: VerificationField;
   expected: string | null;
   extracted: string | null;
   status: FieldStatus;
-  confidence: number;
+  confidence: ConfidenceLevel;
   explanation: string | null;
 };
 
 export type VerificationResult = {
   outcome: VerificationOutcome;
   fields: FieldResult[];
-  imageQualityIssues: string[];
 };

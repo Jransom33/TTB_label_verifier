@@ -1,4 +1,5 @@
 import { POST } from "@/app/api/verifications/route";
+import type { VerificationResult } from "@/domain/verification";
 import { ERROR_DETAILS, PublicApiError, type ApiErrorCode } from "@/server/http";
 import { verifyLabel } from "@/server/verification-service";
 import { beforeEach, expect, test, vi } from "vitest";
@@ -27,19 +28,18 @@ const applicationData = {
 };
 
 const verificationResult = {
-  outcome: "needs_review" as const,
+  outcome: "needs_review",
   fields: [
     {
       field: "brandName",
       expected: applicationData.brandName,
       extracted: null,
-      status: "unreadable" as const,
-      confidence: 0,
+      status: "unreadable",
+      confidence: "low",
       explanation: "Label text has not been extracted yet.",
     },
   ],
-  imageQualityIssues: [],
-};
+} satisfies VerificationResult;
 
 /** Builds an in-memory upload with a copied byte buffer, filename, and MIME type. */
 function imageFile(bytes: Uint8Array, name: string, type: string) {

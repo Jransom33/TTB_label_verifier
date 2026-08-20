@@ -91,7 +91,7 @@ Priority terms:
 ## Requirements needing confirmation
 
 1. The supported beverage types and any type-specific mandatory fields beyond brand name, class/type, alcohol content, and net contents.
-2. The authoritative warning text and whether font size, placement, contrast, and other visual rules must also be validated.
+2. Whether font size, placement, contrast, and visual rules beyond the required bold uppercase warning heading must also be validated.
 3. The maximum upload size and whether one application may contain multiple label images.
 4. The exact confidence thresholds for the confirmed `pass`, `fail`, and `needs_review` outcomes.
 5. Whether batch processing must be synchronous, asynchronous, or both, and its completion-time target.

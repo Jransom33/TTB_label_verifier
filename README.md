@@ -54,17 +54,18 @@ Success:
         "expected": "OLD TOM DISTILLERY",
         "extracted": null,
         "status": "unreadable",
-        "confidence": 0,
+        "confidence": "low",
         "explanation": "Label text has not been extracted yet."
       }
-    ],
-    "imageQualityIssues": []
+    ]
   },
   "requestId": "11111111-1111-1111-1111-111111111111"
 }
 ```
 
-Label extraction is not implemented yet, so a valid upload currently returns `needs_review` with `unreadable` fields.
+Label extraction is not implemented yet, so a valid upload currently returns `needs_review`
+with `unreadable` fields. Confidence is reported as `low`, `medium`, or `high`; provider
+score mappings remain unconfigured until an AI/OCR provider is selected.
 
 Error:
 
@@ -91,6 +92,7 @@ Error:
 
 - Alcohol beverages are treated as one of three TTB commodity types: `beer`, `wine`, or `distilled_spirits`. Other `beverageType` values are rejected. Confirm whether aliases (for example `spirits`) or mixed case should be accepted.
 - Uploads are fully decoded with a 25 megapixel cap. Corrupt or truncated images return `INVALID_REQUEST` (400), not `UNSUPPORTED_MEDIA_TYPE` (415). Confirm both the cap and that error mapping.
+- Government warning rule `v1` requires `GOVERNMENT WARNING:` in capitals and bold, followed by the supplied standard warning wording. Line wrapping is ignored; wording, numbering, capitalization, and punctuation are exact.
 
 ## Original assignment brief
 

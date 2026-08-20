@@ -17,26 +17,31 @@ These were confirmed during API-route implementation:
 - Default image limit is 10 MB (`MAX_IMAGE_BYTES`). Default request limit is that value plus 1 MB (`MAX_REQUEST_BYTES`).
 - Health means application availability only, not provider readiness.
 - One image per verification request. Batch endpoints wait until sync vs async is confirmed.
+- Confidence is categorical: `low`, `medium`, or `high`. Provider-specific score mappings are deferred until the provider is selected.
+- Verification results do not include image-quality reasons; unreadable or uncertain fields carry their own status, confidence, and explanation.
+- Government warning rule `v1` requires a bold `GOVERNMENT WARNING:` heading followed by: `(1) According to the Surgeon General, women should not drink alcoholic beverages during pregnancy because of the risk of birth defects. (2) Consumption of alcoholic beverages impairs your ability to drive a car or operate machinery, and may cause health problems.` Line wrapping is ignored, but wording, capitalization, numbering, and punctuation are exact.
 
-Still unconfirmed: authoritative warning text and visual warning rules, confidence scale/thresholds, AI/OCR provider, and representative accuracy targets.
+Still unconfirmed: additional visual warning rules, provider-to-category confidence mapping, AI/OCR provider, and representative accuracy targets.
 
 ## Component list
 
-### 1. Domain types and verification rules — started
+### 1. Domain types and verification rules — complete
 
 Done:
 
 - Application-data type and schema.
-- Field results (`match`, `mismatch`, `missing`, `unreadable`), overall outcomes (`pass`, `fail`, `needs_review`), and `imageQualityIssues` as `string[]`.
+- Extracted-label types distinguish readable, missing, and unreadable evidence without inventing values.
+- Field results (`match`, `mismatch`, `missing`, `unreadable`) and overall outcomes (`pass`, `fail`, `needs_review`).
+- Categorical confidence (`low`, `medium`, `high`).
+- Versioned government warning wording plus heading capitalization, boldness, and whitespace rules.
+- Exhaustive field-to-strategy metadata for normalized text, alcohol, volume, and exact-warning comparisons.
 - Optional producer and country of origin are included in results only when supplied.
+- Image-quality reasons are deliberately excluded from the result contract.
 
 Remaining:
 
-- Extracted-label types.
-- Versioned government warning text.
-- Field-specific comparison rules.
-- Confidence thresholds and whether confidence is 0–1 or 0–100.
-- Whether image-quality issues should be structured objects instead of strings.
+- Detailed field-specific comparison behavior, including normalization, conversions, and tolerances, belongs to components 2 and 3 below.
+- Provider scores still need to be mapped to confidence categories after the analyzer is selected.
 
 ### 2. Field normalizers — not started
 
@@ -113,6 +118,8 @@ Done:
 - Verification success test (mocked service, real multipart parsing).
 - Verification failure tests: missing/multiple/unsupported/malformed/oversized images, truncated PNG, bad application JSON, provider timeout/unavailability, and sanitized unexpected errors.
 - Application-schema tests for the beverage-type enum and unknown keys.
+- Domain tests for extracted evidence, categorical confidence, warning rule versioning, and exhaustive comparison-rule coverage.
+- Verification-service stub tests for required and optional field results.
 
 Remaining:
 
@@ -122,7 +129,7 @@ Remaining:
 
 ## Build order
 
-1. Define domain types, request/response schemas, rules, and test fixtures. — partial (application + result types; rules still open)
+1. Define domain types, request/response schemas, rules, and test fixtures. — domain contracts and rule metadata done; representative comparison fixtures pending
 2. Build and unit-test field normalizers plus the comparison and decision engine. — not started
 3. Add the label-analyzer interface and a deterministic fake implementation. — not started
 4. Assemble and test the verification service. — stub only
