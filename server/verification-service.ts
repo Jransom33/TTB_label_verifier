@@ -1,9 +1,10 @@
 import { LABEL_FIELDS, type LabelField } from "@/domain/extracted-label";
+import { overallOutcome } from "@/domain/overall-outcome";
 import type { FieldResult, VerificationResult } from "@/domain/verification";
 import type { VerificationRequest } from "@/server/verification-request";
 
 /*
- * Incomplete: no extraction, normalization, warning-text check, or real outcome.
+ * Incomplete: no extraction, normalization, or warning-text check.
  */
 function unreadField(field: LabelField, expected: string): FieldResult {
   return {
@@ -20,8 +21,8 @@ export async function verifyLabel(input: VerificationRequest): Promise<Verificat
   /*
    * Shared pipeline entry point for single and later batch verification.
    * Analysis, normalization, and comparison are later components, so every
-   * supplied label field is returned as unreadable and the overall outcome
-   * is needs_review. The image is accepted but not inspected here.
+   * supplied label field is returned as unreadable. The image is accepted
+   * but not inspected here.
    */
 
   // Keep the image on the function contract for later OCR; ignore it for now.
@@ -37,6 +38,6 @@ export async function verifyLabel(input: VerificationRequest): Promise<Verificat
     return expected === undefined ? [] : [unreadField(field, expected)];
   });
 
-  // Unreadable fields must not pass or fail; send the whole result to human review.
-  return { outcome: "needs_review", fields };
+  // Outcome comes from field statuses and confidences, never from label text.
+  return { outcome: overallOutcome(fields), fields };
 }

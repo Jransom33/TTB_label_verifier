@@ -27,7 +27,7 @@ Each pipeline step owns exactly one verb, and no verb is reused:
 
 ## Decided assumptions
 
-These were confirmed during API-route implementation:
+These were confirmed during implementation:
 
 - Success responses use `{ data, requestId }`. Errors use `{ error: { code, message }, requestId }`. Both also set the `x-request-id` header.
 - Public error codes: `INVALID_REQUEST` (400), `PAYLOAD_TOO_LARGE` (413), `UNSUPPORTED_MEDIA_TYPE` (415), `PROVIDER_UNAVAILABLE` (503), `PROVIDER_TIMEOUT` (504), `INTERNAL_ERROR` (500).
@@ -51,12 +51,13 @@ These were confirmed during API-route implementation:
 - Warning confidence is the lowest of the evidence pieces actually consulted.
 - `expected` and `extracted` are the original strings, never normalized output. For the warning they are the heading plus body, joined with one space.
 - `explanation` is `null` for `match` and a short fixed sentence otherwise.
+- `overallOutcome` sees only statuses and confidences, never label text. `fail` outranks `needs_review`, which outranks `pass`. A `low` confidence reading is never decisive, whatever status it carried. Confident `missing` is `fail`. An empty field list is `needs_review`.
 
 Still unconfirmed: additional visual warning rules, provider-to-category confidence mapping, AI/OCR provider, and representative accuracy targets.
 
 ## Component list
 
-Listed in the order they should be completed. Each entry names its layer and the one reason it changes. Components 1 through 8 are done, apart from normalizer tests; 9 onward is the remaining work in dependency order.
+Listed in the order they should be completed. Each entry names its layer and the one reason it changes. Components 1 through 9 are done; 10 onward is the remaining work in dependency order.
 
 ### 1. Verification vocabulary — entity — complete
 
@@ -83,7 +84,6 @@ Done:
 
 Remaining:
 
-- Detailed field-specific comparison behavior for the overall outcome belongs to component 9.
 - Representative match fixtures for those rules are still pending.
 
 ### 3. Upload guard — adapter — complete
@@ -132,7 +132,7 @@ Done:
 - Error contract: `scan` resolves with an `ExtractedLabel` or throws. Mapping a vendor failure to `PROVIDER_TIMEOUT` or `PROVIDER_UNAVAILABLE` belongs to the adapter, since the port must not import the HTTP layer.
 - Absent or illegible text is evidence, not an error: it returns as `missing` or `unreadable` with a null value.
 
-### 7. Value normalizers — entity — implemented, tests pending
+### 7. Value normalizers — entity — complete
 
 Pure functions in `domain/normalizers.ts`, called by the matchers and never by the use case.
 
@@ -153,11 +153,17 @@ Done:
 - An exact match after normalization yields `match`, and it wins even when the provider said mismatch. Otherwise the provider's verdict decides: `match` becomes `needs_review`, because the values are equivalent but not identical, and `mismatch` stays `mismatch`. Missing and unreadable evidence passes through as its own status and is never judged.
 - The warning is checked against the fixed wording plus the heading text and its boldness. It cannot see other fields or the overall outcome. Correct wording under a non-bold heading is `mismatch`.
 
-### 9. Overall outcome — entity — not started
+### 9. Overall outcome — entity — complete
 
-Depends only on the component 1 field-result type, so it can be built in parallel with 7 and 8.
+Depends only on the component 1 field-result type. The single place the bias toward human review is encoded.
 
-Remaining: derive `pass` / `fail` / `needs_review` from the collected field results. A single `needs_review` field is enough to send the whole result to `needs_review`. Sees only statuses and confidences, never label text, and is the single place the bias toward human review is encoded.
+Done:
+
+- `overallOutcome` in `domain/overall-outcome.ts` derives `pass` / `fail` / `needs_review` from collected field results.
+- Status map: `match` → `pass`; `mismatch` and `missing` → `fail`; `needs_review` and `unreadable` → `needs_review`.
+- A `low` confidence reading is never decisive. Among the rest, `fail` outranks `needs_review`, which outranks `pass`.
+- An empty field list is `needs_review`.
+- The stub service calls `overallOutcome` instead of hardcoding the outcome.
 
 ### 10. Stub label scanner — adapter — not started
 
@@ -204,12 +210,12 @@ Done:
 - Verification success test (mocked use case, real multipart parsing).
 - Verification failure tests: missing/multiple/unsupported/malformed/oversized images, truncated PNG, bad application JSON, provider timeout/unavailability, and sanitized unexpected errors.
 - Application-schema tests for the beverage-type enum and unknown keys.
-- Domain tests for extracted evidence, categorical confidence, warning rule versioning, exhaustive comparison-rule coverage, and exhaustive `matchField` coverage.
+- Domain tests for extracted evidence, categorical confidence, warning rule versioning, exhaustive comparison-rule coverage, exhaustive `matchField` coverage, normalizers, and outcome derivation.
 - Cross-check stub tests for required and optional field results.
 
 Remaining:
 
-- Unit tests for validation helpers, the normalizers now in `domain/normalizers.ts`, warning rules, and outcome derivation.
+- Unit tests for validation helpers and warning rules.
 - Use-case tests with the stub label scanner.
 - Batch tests.
 

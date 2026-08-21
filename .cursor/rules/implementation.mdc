@@ -7,4 +7,4 @@ alwaysApply: false
 
 Use this for one task at a time.
 
-- Implement the task(s) above. Keep the code simple. Add comments explaining each section. Do not implement any other tasks yet. Do not implement any tests yet. Add mult-line comment (docstring) inside of functions to explain them when needed.
+- Implement the task(s) above. Keep the code simple. Add comments explaining each section. Do not implement any other tasks yet. Do not implement any tests yet. Add mult-line comment (docstring) inside of functions to explain them if needed. Keep comment concise.
