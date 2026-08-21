@@ -5,6 +5,10 @@
 export const CONFIDENCE_LEVELS = ["low", "medium", "high"] as const;
 export type ConfidenceLevel = (typeof CONFIDENCE_LEVELS)[number];
 
+// Assumption: callers always pass at least one level.
+export const lowestConfidence = (...levels: ConfidenceLevel[]): ConfidenceLevel =>
+  levels.includes("low") ? "low" : levels.includes("medium") ? "medium" : "high";
+
 // These fields correspond directly to values in the application data.
 export const LABEL_FIELDS = [
   "brandName",
@@ -29,6 +33,14 @@ export type ExtractedEvidence<T> =
 
 export type ExtractedField = ExtractedEvidence<string>;
 
+// The provider's (claude/LLM) opinion on whether what it read matches the application.
+export type FieldVerdict = "match" | "mismatch";
+
+// What the scanner hands back for one field: if it read something it also says whether that matches, and if it didn't there's nothing to have an opinion about.
+export type JudgedField =
+  | (Extract<ExtractedField, { status: "readable" }> & { verdict: FieldVerdict })
+  | Exclude<ExtractedField, { status: "readable" }>;
+
 /*
  * Raw heading text preserves capitalization for exact comparison later.
  * Boldness remains separate visual evidence rather than a provider verdict.
@@ -40,6 +52,6 @@ export type GovernmentWarningEvidence = {
 };
 
 export type ExtractedLabel = {
-  fields: Record<LabelField, ExtractedField>;
+  fields: Record<LabelField, JudgedField>;
   governmentWarning: GovernmentWarningEvidence;
 };

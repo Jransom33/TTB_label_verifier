@@ -1,8 +1,17 @@
 import type { ConfidenceLevel } from "@/domain/extracted-label";
 import type { VerificationField } from "@/domain/verification-rules";
 
-// These statuses and outcomes form the documented public API contract.
-export type FieldStatus = "match" | "mismatch" | "missing" | "unreadable";
+/*
+ * These statuses and outcomes form the documented public API contract.
+ * `needs_review` is the field-level counterpart of the overall outcome: the
+ * provider judged the value equivalent, but it was not an exact match.
+ */
+export type FieldStatus =
+  | "match"
+  | "needs_review"
+  | "mismatch"
+  | "missing"
+  | "unreadable";
 export type VerificationOutcome = "pass" | "fail" | "needs_review";
 
 export type FieldResult = {

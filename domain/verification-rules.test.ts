@@ -16,8 +16,8 @@ test("defines one comparison strategy for every verification field", () => {
   expect(FIELD_COMPARISON_RULES).toEqual({
     brandName: "normalized_text",
     classType: "normalized_text",
-    alcoholContent: "alcohol_equivalence",
-    netContents: "volume_equivalence",
+    alcoholContent: "normalized_text",
+    netContents: "normalized_text",
     producer: "normalized_text",
     countryOfOrigin: "normalized_text",
     governmentWarning: "exact_warning",

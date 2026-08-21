@@ -6,6 +6,7 @@
 import sharp from "sharp";
 import { applicationDataSchema, type ApplicationData } from "@/domain/application";
 import { PublicApiError, type ApiErrorCode } from "@/server/http";
+import type { LabelImage } from "@/usecases/ports/label-scanner";
 
 const DEFAULT_MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 const REQUEST_OVERHEAD_BYTES = 1024 * 1024;
@@ -31,12 +32,10 @@ export class RequestValidationError extends PublicApiError {
   }
 }
 
+// The image shape is the scanner port's, so validation and scanning cannot drift apart.
 export type VerificationRequest = {
   applicationData: ApplicationData;
-  image: {
-    bytes: Uint8Array;
-    mediaType: "image/jpeg" | "image/png";
-  };
+  image: LabelImage;
 };
 
 /** Returns a positive integer environment limit or its safe default. */

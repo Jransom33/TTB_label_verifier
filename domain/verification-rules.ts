@@ -3,18 +3,20 @@ import { LABEL_FIELDS } from "@/domain/extracted-label";
 export const VERIFICATION_FIELDS = [...LABEL_FIELDS, "governmentWarning"] as const;
 export type VerificationField = (typeof VERIFICATION_FIELDS)[number];
 
-export type ComparisonStrategy =
-  | "normalized_text"
-  | "alcohol_equivalence"
-  | "volume_equivalence"
-  | "exact_warning";
+export type ComparisonStrategy = "normalized_text" | "exact_warning";
 
-// Each verification field must select one shared comparison strategy.
+/*
+ * Each verification field must select one shared comparison strategy. Alcohol
+ * content and net contents are plain text like the rest because the provider
+ * decides whether different units mean the same thing; we only tidy the text up
+ * and compare it. The warning is the exception, since its wording is fixed and
+ * we check it ourselves.
+ */
 export const FIELD_COMPARISON_RULES = {
   brandName: "normalized_text",
   classType: "normalized_text",
-  alcoholContent: "alcohol_equivalence",
-  netContents: "volume_equivalence",
+  alcoholContent: "normalized_text",
+  netContents: "normalized_text",
   producer: "normalized_text",
   countryOfOrigin: "normalized_text",
   governmentWarning: "exact_warning",
