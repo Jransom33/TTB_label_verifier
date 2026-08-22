@@ -1,11 +1,11 @@
 import { POST } from "@/app/api/verifications/route";
 import type { VerificationResult } from "@/domain/verification";
 import { ERROR_DETAILS, PublicApiError, type ApiErrorCode } from "@/server/http";
-import { verifyLabel } from "@/server/verification-service";
+import { crossCheckLabel } from "@/usecases/cross-check-label";
 import { beforeEach, expect, test, vi } from "vitest";
 
-vi.mock("@/server/verification-service", () => ({
-  verifyLabel: vi.fn(),
+vi.mock("@/usecases/cross-check-label", () => ({
+  crossCheckLabel: vi.fn(),
 }));
 
 const UUID =
@@ -36,7 +36,7 @@ const verificationResult = {
       extracted: null,
       status: "unreadable",
       confidence: "low",
-      explanation: "Label text has not been extracted yet.",
+      explanation: "This field could not be read from the label.",
     },
   ],
 } satisfies VerificationResult;
@@ -98,21 +98,21 @@ async function expectError(
 }
 
 beforeEach(() => {
-  vi.mocked(verifyLabel).mockReset();
-  vi.mocked(verifyLabel).mockResolvedValue(verificationResult);
+  vi.mocked(crossCheckLabel).mockReset();
+  vi.mocked(crossCheckLabel).mockResolvedValue(verificationResult);
 });
 
-/** Valid PNG plus application JSON: parse, call verifyLabel once, return its result. */
-test("POST /api/verifications parses one upload, calls the service once, and returns its result", async () => {
+/** Valid PNG plus application JSON: parse, cross-check once, return the result. */
+test("POST /api/verifications parses one upload, calls the use case once, and returns its result", async () => {
   const response = await post(
     multipart({ applicationData: JSON.stringify(applicationData) }),
   );
   const body: unknown = await response.json();
 
   expect(response.status).toBe(200);
-  expect(verifyLabel).toHaveBeenCalledOnce();
+  expect(crossCheckLabel).toHaveBeenCalledOnce();
 
-  const parsed = vi.mocked(verifyLabel).mock.calls[0][0];
+  const parsed = vi.mocked(crossCheckLabel).mock.calls[0][0];
   expect(parsed.applicationData).toEqual(applicationData);
   expect(parsed.image.mediaType).toBe("image/png");
   expect(parsed.image.bytes).toEqual(pngBytes);
@@ -182,10 +182,10 @@ test.each([
 ])("POST /api/verifications rejects $name", async ({ body, code }) => {
   const response = await post(body());
   await expectError(response, code, ["OLD TOM DISTILLERY", "at "]);
-  expect(verifyLabel).not.toHaveBeenCalled();
+  expect(crossCheckLabel).not.toHaveBeenCalled();
 });
 
-/** Image larger than MAX_IMAGE_BYTES is 413 and never reaches the service. */
+/** Image larger than MAX_IMAGE_BYTES is 413 and never reaches the use case. */
 test("POST /api/verifications rejects an oversized image", async () => {
   const previous = process.env.MAX_IMAGE_BYTES;
   process.env.MAX_IMAGE_BYTES = "8";
@@ -195,7 +195,7 @@ test("POST /api/verifications rejects an oversized image", async () => {
       multipart({ applicationData: JSON.stringify(applicationData) }),
     );
     await expectError(response, "PAYLOAD_TOO_LARGE", ["OLD TOM DISTILLERY"]);
-    expect(verifyLabel).not.toHaveBeenCalled();
+    expect(crossCheckLabel).not.toHaveBeenCalled();
   } finally {
     if (previous === undefined) delete process.env.MAX_IMAGE_BYTES;
     else process.env.MAX_IMAGE_BYTES = previous;
@@ -204,13 +204,13 @@ test("POST /api/verifications rejects an oversized image", async () => {
 
 /** Known provider failures map to 504 timeout and 503 unavailable. */
 test("POST /api/verifications maps provider timeout and unavailability", async () => {
-  vi.mocked(verifyLabel).mockRejectedValueOnce(new PublicApiError("PROVIDER_TIMEOUT"));
+  vi.mocked(crossCheckLabel).mockRejectedValueOnce(new PublicApiError("PROVIDER_TIMEOUT"));
   await expectError(
     await post(multipart({ applicationData: JSON.stringify(applicationData) })),
     "PROVIDER_TIMEOUT",
   );
 
-  vi.mocked(verifyLabel).mockRejectedValueOnce(new PublicApiError("PROVIDER_UNAVAILABLE"));
+  vi.mocked(crossCheckLabel).mockRejectedValueOnce(new PublicApiError("PROVIDER_UNAVAILABLE"));
   await expectError(
     await post(multipart({ applicationData: JSON.stringify(applicationData) })),
     "PROVIDER_UNAVAILABLE",
@@ -220,12 +220,12 @@ test("POST /api/verifications maps provider timeout and unavailability", async (
 /** Unexpected errors become INTERNAL_ERROR with no stack, secrets, or application data. */
 test("POST /api/verifications sanitizes unexpected errors", async () => {
   const leak = "ssn-123-45-6789";
-  vi.mocked(verifyLabel).mockRejectedValueOnce(
-    new Error(`${leak}\n    at verifyLabel (verification-service.ts:12:3)`),
+  vi.mocked(crossCheckLabel).mockRejectedValueOnce(
+    new Error(`${leak}\n    at crossCheckLabel (cross-check-label.ts:12:3)`),
   );
 
   const response = await post(
     multipart({ applicationData: JSON.stringify(applicationData) }),
   );
-  await expectError(response, "INTERNAL_ERROR", [leak, "verification-service.ts", "OLD TOM DISTILLERY"]);
+  await expectError(response, "INTERNAL_ERROR", [leak, "cross-check-label.ts", "OLD TOM DISTILLERY"]);
 });

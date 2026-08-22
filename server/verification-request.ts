@@ -1,12 +1,13 @@
 /**
  * Validates multipart verification requests at the API trust boundary.
  * It bounds request size, validates the image and application data, and returns
- * safe in-memory input for the verification service.
+ * safe in-memory input for the verification use case.
  */
 import sharp from "sharp";
 import { applicationDataSchema, type ApplicationData } from "@/domain/application";
 import { PublicApiError, type ApiErrorCode } from "@/server/http";
-import type { LabelImage } from "@/usecases/ports/label-scanner";
+// The use case owns its input contract, so parsing and verifying cannot drift apart.
+import type { VerificationRequest } from "@/usecases/cross-check-label";
 
 const DEFAULT_MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 const REQUEST_OVERHEAD_BYTES = 1024 * 1024;
@@ -31,12 +32,6 @@ export class RequestValidationError extends PublicApiError {
     this.name = "RequestValidationError";
   }
 }
-
-// The image shape is the scanner port's, so validation and scanning cannot drift apart.
-export type VerificationRequest = {
-  applicationData: ApplicationData;
-  image: LabelImage;
-};
 
 /** Returns a positive integer environment limit or its safe default. */
 function configuredLimit(name: string, fallback: number): number {

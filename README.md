@@ -55,7 +55,15 @@ Success:
         "extracted": null,
         "status": "unreadable",
         "confidence": "low",
-        "explanation": "Label text has not been extracted yet."
+        "explanation": "This field could not be read from the label."
+      },
+      {
+        "field": "governmentWarning",
+        "expected": "GOVERNMENT WARNING: (1) According to the Surgeon General, women should not drink alcoholic beverages during pregnancy because of the risk of birth defects. (2) Consumption of alcoholic beverages impairs your ability to drive a car or operate machinery, and may cause health problems.",
+        "extracted": null,
+        "status": "unreadable",
+        "confidence": "low",
+        "explanation": "This field could not be read from the label."
       }
     ]
   },
@@ -63,7 +71,8 @@ Success:
 }
 ```
 
-Label extraction is not implemented yet, so a valid upload currently returns `needs_review`
+The cross-check pipeline is implemented, but no vision provider reads the image yet. The
+live route uses a placeholder scanner, so a valid upload currently returns `needs_review`
 with `unreadable` fields. Confidence is reported as `low`, `medium`, or `high`; provider
 score mappings remain unconfigured until an AI/OCR provider is selected.
 

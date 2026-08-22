@@ -57,7 +57,7 @@ Still unconfirmed: additional visual warning rules, provider-to-category confide
 
 ## Component list
 
-Listed in the order they should be completed. Each entry names its layer and the one reason it changes. Components 1 through 9 are done; 10 onward is the remaining work in dependency order.
+Listed in the order they should be completed. Each entry names its layer and the one reason it changes. Components 1 through 11 are done; 12 onward is the remaining work in dependency order.
 
 ### 1. Verification vocabulary — entity — complete
 
@@ -165,24 +165,26 @@ Done:
 - An empty field list is `needs_review`.
 - The stub service calls `overallOutcome` instead of hardcoding the outcome.
 
-### 10. Stub label scanner — adapter — not started
-
-Remaining: `StubLabelScanner` implements the component 6 port by returning fixed `ExtractedLabel` fixtures, including the per-field verdicts a real provider would supply, so the whole pipeline is testable offline and without a provider decision.
-
-### 11. Cross-check label — use case — stub only
-
-The point at which a real request returns a real verdict instead of placeholders. Needs components 6 through 10.
+### 10. Stub label scanner — adapter — complete
 
 Done:
 
-- A single pipeline entry point used by the verification route.
-- It returns one complete `VerificationResult` per request.
+- `stubLabelScanner` in `adapters/stub-label-scanner.ts` implements the component 6 port.
+- Default evidence is derived from the application: supplied fields come back readable with a `match` verdict and `high` confidence; omitted optionals come back `missing`.
+- The government warning defaults to the TTB heading and body with a bold heading, since its wording is not in the application.
+- Per-field and warning overrides let tests force other evidence without a provider.
+- Adapter tests cover readable defaults, missing optionals, the default warning, and partial overrides.
 
-Remaining:
+### 11. Cross-check label — use case — complete
 
-- Rename the existing `verifyLabel` stub to `crossCheckLabel` and move it out of `server/` into the use-case layer. Its image type already comes from the component 6 port; what remains is moving `VerificationRequest` itself out of the upload guard.
-- Orchestrate scanning, matching, and the overall outcome, holding no rules of its own.
-- Until those exist, every supplied label field is `unreadable` and the outcome is `needs_review`. The image is accepted but not inspected. Government warning is not checked yet.
+The provider-neutral pipeline that turns scanner evidence into one verdict. Needs components 6 through 10.
+
+Done:
+
+- `crossCheckLabel` and its `VerificationRequest` live in `usecases/cross-check-label.ts`, outside the HTTP layer.
+- The use case calls the injected scanner, matches each supplied application field plus the government warning, and derives one complete `VerificationResult` with `overallOutcome`. It holds no rules of its own.
+- The verification route is the composition point. Until component 12 exists, it injects `unreadLabelScanner`, which does not inspect the image and reports every field and warning evidence as unreadable with low confidence, producing `needs_review`.
+- Use-case tests drive the real matchers and outcome rule with the stub scanner so the pipeline can pass, fail, or need review offline.
 
 ### 12. Vision label scanner — adapter — not started
 
@@ -211,12 +213,12 @@ Done:
 - Verification failure tests: missing/multiple/unsupported/malformed/oversized images, truncated PNG, bad application JSON, provider timeout/unavailability, and sanitized unexpected errors.
 - Application-schema tests for the beverage-type enum and unknown keys.
 - Domain tests for extracted evidence, categorical confidence, warning rule versioning, exhaustive comparison-rule coverage, exhaustive `matchField` coverage, normalizers, and outcome derivation.
-- Cross-check stub tests for required and optional field results.
+- Stub label scanner tests: readable defaults across `LABEL_FIELDS`, missing optionals, the default warning, and partial overrides.
+- Cross-check use-case tests with the stub and placeholder scanners: pass, omitted optionals, fail and review outcomes, warning boldness, and the live unreadable fallback.
 
 Remaining:
 
 - Unit tests for validation helpers and warning rules.
-- Use-case tests with the stub label scanner.
 - Batch tests.
 
 ## Deliberately excluded
