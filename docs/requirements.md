@@ -16,7 +16,7 @@ Priority terms:
 
 - **FR-1 (Must):** Accept a label image and the application values against which the label will be checked.
 - **FR-2 (Must):** Accept PNG and JPEG images (`.png`, `.jpg`, and `.jpeg`) and reject missing, unsupported, oversized, or malformed uploads with a clear error.
-- **FR-3 (Must):** Accept the beverage type and relevant application fields, including:
+- **FR-3 (Must):** Accept the relevant application fields, including:
   - Brand name
   - Class/type
   - Alcohol content
@@ -33,7 +33,7 @@ Priority terms:
 - **FR-6 (Must):** Apply field-appropriate normalization before comparison. Harmless differences such as brand-name capitalization must not cause an automatic mismatch, while the original values remain available for review.
 - **FR-7 (Must):** Compare equivalent alcohol and volume representations correctly, such as ABV versus proof and equivalent volume units.
 - **FR-8 (Must):** Check that the complete, authoritative government health warning text is present and exact.
-- **FR-9 (Must):** Check that `GOVERNMENT WARNING:` uses the required capitalization and is visually bold.
+- **FR-9 (Must):** Check that the entire government warning is all caps and that `GOVERNMENT WARNING:` is visually bold.
 - **FR-10 (Must):** Distinguish among confirmed matches, confirmed mismatches, missing fields, and fields that cannot be read or verified reliably.
 - **FR-11 (Must):** Route uncertain, nuanced, or low-confidence comparisons to human review instead of returning a false pass or failure.
 - **FR-12 (Should):** Detect poor image quality, glare, rotation, or perspective issues and either compensate for them or explain that a clearer image is required.
@@ -90,7 +90,7 @@ Priority terms:
 
 ## Requirements needing confirmation
 
-1. The supported beverage types and any type-specific mandatory fields beyond brand name, class/type, alcohol content, and net contents.
+1. Any type-specific mandatory fields beyond brand name, class/type, alcohol content, and net contents.
 2. Whether font size, placement, contrast, and visual rules beyond the required bold uppercase warning heading must also be validated.
 3. The maximum upload size and whether one application may contain multiple label images.
 4. The exact confidence thresholds for the confirmed `pass`, `fail`, and `needs_review` outcomes.

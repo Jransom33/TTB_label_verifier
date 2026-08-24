@@ -20,7 +20,6 @@ const pngBytes = Uint8Array.from([
 ]);
 
 const applicationData = {
-  beverageType: "distilled_spirits",
   brandName: "OLD TOM DISTILLERY",
   classType: "Kentucky Straight Bourbon Whiskey",
   alcoholContent: "45% Alc./Vol. (90 Proof)",

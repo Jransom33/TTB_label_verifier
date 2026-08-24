@@ -7,7 +7,6 @@ import { expect, test } from "vitest";
 const image = { bytes: new Uint8Array([1]), mediaType: "image/png" as const };
 
 const requiredApplication = {
-  beverageType: "distilled_spirits",
   brandName: "OLD TOM DISTILLERY",
   classType: "Kentucky Straight Bourbon Whiskey",
   alcoholContent: "45% Alc./Vol. (90 Proof)",

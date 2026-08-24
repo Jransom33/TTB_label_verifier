@@ -1,6 +1,6 @@
 /*
- * Provider adapters must map their scores to these categories.
- * Incomplete: the category thresholds remain intentionally undefined.
+ * Provider adapters must emit these categories. Claude reports them directly;
+ * there is no numeric score to threshold.
  */
 export const CONFIDENCE_LEVELS = ["low", "medium", "high"] as const;
 export type ConfidenceLevel = (typeof CONFIDENCE_LEVELS)[number];
@@ -20,7 +20,8 @@ export const LABEL_FIELDS = [
 ] as const;
 export type LabelField = (typeof LABEL_FIELDS)[number];
 
-export type ExtractionStatus = "readable" | "missing" | "unreadable";
+export const EXTRACTION_STATUSES = ["readable", "missing", "unreadable"] as const;
+export type ExtractionStatus = (typeof EXTRACTION_STATUSES)[number];
 
 // A null value prevents missing or unreadable text from being invented.
 export type ExtractedEvidence<T> =
@@ -34,7 +35,8 @@ export type ExtractedEvidence<T> =
 export type ExtractedField = ExtractedEvidence<string>;
 
 // The provider's (claude/LLM) opinion on whether what it read matches the application.
-export type FieldVerdict = "match" | "mismatch";
+export const FIELD_VERDICTS = ["match", "mismatch"] as const;
+export type FieldVerdict = (typeof FIELD_VERDICTS)[number];
 
 // What the scanner hands back for one field: if it read something it also says whether that matches, and if it didn't there's nothing to have an opinion about.
 export type JudgedField =

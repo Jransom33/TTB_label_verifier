@@ -32,19 +32,19 @@ These were confirmed during implementation:
 - Success responses use `{ data, requestId }`. Errors use `{ error: { code, message }, requestId }`. Both also set the `x-request-id` header.
 - Public error codes: `INVALID_REQUEST` (400), `PAYLOAD_TOO_LARGE` (413), `UNSUPPORTED_MEDIA_TYPE` (415), `PROVIDER_UNAVAILABLE` (503), `PROVIDER_TIMEOUT` (504), `INTERNAL_ERROR` (500).
 - `POST /api/verifications` accepts `multipart/form-data` with exactly one file field `image` and one text field `applicationData` (JSON string).
-- Required application fields: `beverageType`, `brandName`, `classType`, `alcoholContent`, `netContents`. `producer` is one optional string. `countryOfOrigin` is optional. Unknown JSON keys are rejected.
-- `beverageType` is request metadata (`beer`, `wine`, or `distilled_spirits`) and is not compared as a label field. `classType` is the label designation.
+- Required application fields: `brandName`, `classType`, `alcoholContent`, `netContents`. `producer` is one optional string. `countryOfOrigin` is optional. Unknown JSON keys are rejected.
+- `classType` is the label designation.
 - Optional producer and country of origin are verified only when supplied.
 - Default image limit is 10 MB (`MAX_IMAGE_BYTES`). Default request limit is that value plus 1 MB (`MAX_REQUEST_BYTES`).
 - Health means application availability only, not provider readiness.
 - One image per verification request. Batch endpoints wait until sync vs async is confirmed.
-- Confidence is categorical: `low`, `medium`, or `high`. Provider-specific score mappings are deferred until the provider is selected.
+- Confidence is categorical: `low`, `medium`, or `high`. Claude does not expose numeric scores; the adapter asks for these categories and validates the enum. The labels are model-reported, not calibrated thresholds.
 - Verification results do not include image-quality reasons; unreadable or uncertain fields carry their own status, confidence, and explanation.
 - The provider (LLM/Claude) judges each supplied field against its expected value and returns a `match` or `mismatch` verdict beside the text it read. Equivalence, including differing units and formats, is its call.
 - Code performs no unit or numeric conversion. It normalizes text and compares strings.
 - An exact match after normalization always yields `match`, even when the provider said mismatch. Otherwise the provider's verdict stands: equivalent but not identical is `needs_review`, and a rejected value is `mismatch`.
 - Field statuses are `match`, `needs_review`, `mismatch`, `missing`, and `unreadable`.
-- Government warning rule `v1` requires a bold `GOVERNMENT WARNING:` heading followed by: `(1) According to the Surgeon General, women should not drink alcoholic beverages during pregnancy because of the risk of birth defects. (2) Consumption of alcoholic beverages impairs your ability to drive a car or operate machinery, and may cause health problems.` Line wrapping is ignored, but wording, capitalization, numbering, and punctuation are exact.
+- Government warning rule `v1` requires a bold `GOVERNMENT WARNING:` heading followed by: `(1) ACCORDING TO THE SURGEON GENERAL, WOMEN SHOULD NOT DRINK ALCOHOLIC BEVERAGES DURING PREGNANCY BECAUSE OF THE RISK OF BIRTH DEFECTS. (2) CONSUMPTION OF ALCOHOLIC BEVERAGES IMPAIRS YOUR ABILITY TO DRIVE A CAR OR OPERATE MACHINERY, AND MAY CAUSE HEALTH PROBLEMS.` The entire warning is all caps. Line wrapping is ignored, but wording, capitalization, numbering, and punctuation are exact.
 - Correct warning wording under a heading that is not bold is `mismatch`.
 - Warning boldness that cannot be read is `needs_review`, not a pass-through status: the wording was already verified.
 - Among the two warning text pieces, `unreadable` outranks `missing`.
@@ -53,11 +53,11 @@ These were confirmed during implementation:
 - `explanation` is `null` for `match` and a short fixed sentence otherwise.
 - `overallOutcome` sees only statuses and confidences, never label text. `fail` outranks `needs_review`, which outranks `pass`. A `low` confidence reading is never decisive, whatever status it carried. Confident `missing` is `fail`. An empty field list is `needs_review`.
 
-Still unconfirmed: additional visual warning rules, provider-to-category confidence mapping, AI/OCR provider, and representative accuracy targets.
+Still unconfirmed: additional visual warning rules and representative accuracy targets. The vision provider is Anthropic Claude (`ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL`, outbound `api.anthropic.com:443`).
 
 ## Component list
 
-Listed in the order they should be completed. Each entry names its layer and the one reason it changes. Components 1 through 11 are done; 12 onward is the remaining work in dependency order.
+Listed in the order they should be completed. Each entry names its layer and the one reason it changes. Components 1 through 12 are done; 13 onward is the remaining work in dependency order.
 
 ### 1. Verification vocabulary — entity — complete
 
@@ -91,7 +91,6 @@ Remaining:
 Done:
 
 - Zod application-data schema with required/optional fields, trimming, blank rejection, and length limits. The schema itself lives with the entities in `domain/application.ts`.
-- `beverageType` is one of `beer`, `wine`, or `distilled_spirits`.
 - Exactly one `image` and one `applicationData` field.
 - `.png` / `.jpg` / `.jpeg` only, with matching MIME type and PNG/JPEG magic bytes.
 - Full PNG/JPEG decode after the signature check; truncated or corrupt files are `INVALID_REQUEST`. Pixel count is capped at 25 megapixels.
@@ -183,14 +182,20 @@ Done:
 
 - `crossCheckLabel` and its `VerificationRequest` live in `usecases/cross-check-label.ts`, outside the HTTP layer.
 - The use case calls the injected scanner, matches each supplied application field plus the government warning, and derives one complete `VerificationResult` with `overallOutcome`. It holds no rules of its own.
-- The verification route is the composition point. Until component 12 exists, it injects `unreadLabelScanner`, which does not inspect the image and reports every field and warning evidence as unreadable with low confidence, producing `needs_review`.
+- The verification route is the composition point and injects `visionLabelScanner`. `unreadLabelScanner` remains for offline tests.
 - Use-case tests drive the real matchers and outcome rule with the stub scanner so the pipeline can pass, fail, or need review offline.
 
-### 12. Vision label scanner — adapter — not started
+### 12. Vision label scanner — adapter — complete
 
 Changes when the vendor changes. Deliberately late: it is the component most likely to be blocked by the target network or replaced outright, and by this point everything behind it is proven against the stub.
 
-Remaining: `VisionLabelScanner` implements the component 6 port and is the only code that knows a vendor exists. Owns prompt construction and isolation, the provider call, timeouts, bounded retries, and structured output validation so a malformed or invented reply never reaches the matchers. The prompt is what elicits a per-field verdict against the supplied application data, and validation must reject a verdict attached to a field the provider did not actually read. Provider scores are mapped to the confidence categories here, once the provider is selected.
+Done:
+
+- `visionLabelScanner` implements the component 6 port. It is the only code that knows Anthropic exists.
+- Owns prompt construction and isolation, the Claude call, a 5s timeout, one bounded retry, and structured-output validation so a malformed or invented reply never reaches the matchers.
+- The prompt asks for a per-field verdict against supplied application data. Validation rejects unknown, duplicate, or omitted fields, and rejects a verdict on a field that was not actually read.
+- Omitted optional application fields are filled locally as `missing` / `high` so Claude never judges data it was not given.
+- Timeouts map to `PROVIDER_TIMEOUT`. Known API, configuration, and invalid-response failures map to `PROVIDER_UNAVAILABLE`. Unexpected defects stay unsanitized until the HTTP presenter maps them to `INTERNAL_ERROR`.
 
 ### 13. Telemetry port — port — not started
 
@@ -214,7 +219,8 @@ Done:
 - Application-schema tests for the beverage-type enum and unknown keys.
 - Domain tests for extracted evidence, categorical confidence, warning rule versioning, exhaustive comparison-rule coverage, exhaustive `matchField` coverage, normalizers, and outcome derivation.
 - Stub label scanner tests: readable defaults across `LABEL_FIELDS`, missing optionals, the default warning, and partial overrides.
-- Cross-check use-case tests with the stub and placeholder scanners: pass, omitted optionals, fail and review outcomes, warning boldness, and the live unreadable fallback.
+- Cross-check use-case tests cover pass, fail, review, omitted optionals, warning boldness, and the offline `unreadLabelScanner`, which reports every field unreadable.
+- Vision scanner tests (mocked Anthropic): request construction, valid mapping, omitted optionals, warning evidence, categorical confidence, semantic-validation rejections, and sanitized timeout/unavailability mapping.
 
 Remaining:
 

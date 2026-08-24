@@ -12,6 +12,8 @@ npm run lint
 npm run build
 ```
 
+Copy `.env.example` to `.env.local` and set `ANTHROPIC_API_KEY` plus `ANTHROPIC_MODEL` (a Claude model that accepts images and structured outputs). The live route calls `api.anthropic.com:443`; allow that outbound path. Each provider call uses a 5s timeout and one retry for transient failures.
+
 Optional limits: `MAX_IMAGE_BYTES` (default 10 MB) and `MAX_REQUEST_BYTES` (default image limit + 1 MB).
 
 ## API
@@ -34,12 +36,12 @@ curl -s http://localhost:3000/api/health
 
 `multipart/form-data` with exactly one file field `image` (`.png`, `.jpg`, or `.jpeg`) and exactly one text field `applicationData` (JSON).
 
-Required JSON fields: `beverageType` (`beer`, `wine`, or `distilled_spirits`), `brandName`, `classType`, `alcoholContent`, `netContents`. Optional: `producer`, `countryOfOrigin`. `beverageType` is the commodity category; `classType` is the label designation (for example `Kentucky Straight Bourbon Whiskey`).
+Required JSON fields: `brandName`, `classType`, `alcoholContent`, `netContents`. Optional: `producer`, `countryOfOrigin`. `classType` is the label designation (for example `Kentucky Straight Bourbon Whiskey`).
 
 ```bash
 curl -s http://localhost:3000/api/verifications \
   -F 'image=@label.png' \
-  -F 'applicationData={"beverageType":"distilled_spirits","brandName":"OLD TOM DISTILLERY","classType":"Kentucky Straight Bourbon Whiskey","alcoholContent":"45% Alc./Vol. (90 Proof)","netContents":"750 mL"}'
+  -F 'applicationData={"brandName":"OLD TOM DISTILLERY","classType":"Kentucky Straight Bourbon Whiskey","alcoholContent":"45% Alc./Vol. (90 Proof)","netContents":"750 mL"}'
 ```
 
 Success:
@@ -59,7 +61,7 @@ Success:
       },
       {
         "field": "governmentWarning",
-        "expected": "GOVERNMENT WARNING: (1) According to the Surgeon General, women should not drink alcoholic beverages during pregnancy because of the risk of birth defects. (2) Consumption of alcoholic beverages impairs your ability to drive a car or operate machinery, and may cause health problems.",
+        "expected": "GOVERNMENT WARNING: (1) ACCORDING TO THE SURGEON GENERAL, WOMEN SHOULD NOT DRINK ALCOHOLIC BEVERAGES DURING PREGNANCY BECAUSE OF THE RISK OF BIRTH DEFECTS. (2) CONSUMPTION OF ALCOHOLIC BEVERAGES IMPAIRS YOUR ABILITY TO DRIVE A CAR OR OPERATE MACHINERY, AND MAY CAUSE HEALTH PROBLEMS.",
         "extracted": null,
         "status": "unreadable",
         "confidence": "low",
@@ -71,10 +73,17 @@ Success:
 }
 ```
 
-The cross-check pipeline is implemented, but no vision provider reads the image yet. The
-live route uses a placeholder scanner, so a valid upload currently returns `needs_review`
-with `unreadable` fields. Confidence is reported as `low`, `medium`, or `high`; provider
-score mappings remain unconfigured until an AI/OCR provider is selected.
+The live route sends the image to Claude. Confidence is Claude's own `low` / `medium` /
+`high` judgment, not a numeric score; treat it as uncalibrated. Automated tests mock the
+SDK and never call Anthropic.
+
+Manual smoke test (requires credentials and a real label image):
+
+```bash
+curl -s http://localhost:3000/api/verifications \
+  -F 'image=@label.png' \
+  -F 'applicationData={"brandName":"OLD TOM DISTILLERY","classType":"Kentucky Straight Bourbon Whiskey","alcoholContent":"45% Alc./Vol. (90 Proof)","netContents":"750 mL"}'
+```
 
 Error:
 
@@ -99,9 +108,8 @@ Error:
 
 ## Assumptions
 
-- Alcohol beverages are treated as one of three TTB commodity types: `beer`, `wine`, or `distilled_spirits`. Other `beverageType` values are rejected. Confirm whether aliases (for example `spirits`) or mixed case should be accepted.
 - Uploads are fully decoded with a 25 megapixel cap. Corrupt or truncated images return `INVALID_REQUEST` (400), not `UNSUPPORTED_MEDIA_TYPE` (415). Confirm both the cap and that error mapping.
-- Government warning rule `v1` requires `GOVERNMENT WARNING:` in capitals and bold, followed by the supplied standard warning wording. Line wrapping is ignored; wording, numbering, capitalization, and punctuation are exact.
+- Government warning rule `v1` requires the full warning in capitals, with a bold `GOVERNMENT WARNING:` heading, followed by the supplied standard warning wording. Line wrapping is ignored; wording, numbering, capitalization, and punctuation are exact.
 
 ## Original assignment brief
 

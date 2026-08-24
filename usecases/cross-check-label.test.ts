@@ -8,7 +8,6 @@ import type { LabelScanner } from "@/usecases/ports/label-scanner";
 import { expect, test } from "vitest";
 
 const requiredApplication = {
-  beverageType: "distilled_spirits",
   brandName: "OLD TOM DISTILLERY",
   classType: "Kentucky Straight Bourbon Whiskey",
   alcoholContent: "45% Alc./Vol. (90 Proof)",
