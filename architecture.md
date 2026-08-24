@@ -6,7 +6,7 @@ Dependencies only point inward: adapters know about use cases, use cases know ab
 
 ```mermaid
 flowchart TB
-  subgraph adapters ["Adapters (HTTP, scanners, errors)"]
+  subgraph adapters ["Adapters (HTTP, scanners, errors, telemetry)"]
     Route["POST /api/verifications<br/>app/api/verifications/route.ts"]
     Health["GET /api/health"]
     Parse["parseVerificationRequest<br/>server/verification-request.ts"]
@@ -15,11 +15,13 @@ flowchart TB
     Stub["stubLabelScanner"]
     Vision["visionLabelScanner"]
     VisionParse["parseVisionResponse"]
+    Console["consoleTelemetry"]
   end
 
   subgraph usecases ["Use cases"]
     CrossCheck["crossCheckLabel"]
     Port["LabelScanner port<br/>scan(image, application) → ExtractedLabel"]
+    TelemetryPort["Telemetry port<br/>recordVerification"]
   end
 
   subgraph domain ["Entities (rules + vocabulary)"]
@@ -35,6 +37,7 @@ flowchart TB
   Route --> Parse
   Route --> CrossCheck
   Route --> Http
+  Route --> TelemetryPort
   Parse --> App
   CrossCheck --> Port
   CrossCheck --> Match
@@ -42,6 +45,7 @@ flowchart TB
   Port -.-> Unread
   Port -.-> Stub
   Port -.-> Vision
+  TelemetryPort -.-> Console
   Vision --> VisionParse
   VisionParse --> Extracted
   Unread --> Extracted
@@ -52,7 +56,7 @@ flowchart TB
   Outcome --> Result
 ```
 
-The live route injects `visionLabelScanner`. Tests drive the pipeline with `stubLabelScanner` and keep `unreadLabelScanner` as an offline fallback.
+The live route injects `visionLabelScanner` and `consoleTelemetry`. Tests drive the pipeline with `stubLabelScanner` and keep `unreadLabelScanner` as an offline fallback.
 
 ---
 
@@ -68,6 +72,7 @@ sequenceDiagram
   participant Scanner as LabelScanner
   participant Match as matchField
   participant Fold as overallOutcome
+  participant Telemetry as Telemetry
 
   Client->>Route: multipart image + applicationData JSON
   Route->>Guard: Request
@@ -75,7 +80,7 @@ sequenceDiagram
   Guard->>Schema: JSON.parse then Zod
   Schema-->>Guard: ApplicationData
   Guard-->>Route: VerificationRequest
-  Route->>UC: request + injected scanner
+  Route->>UC: request + timed scanner
   UC->>Scanner: scan(image, applicationData)
   Scanner-->>UC: ExtractedLabel
   loop each supplied label field + government warning
@@ -85,10 +90,11 @@ sequenceDiagram
   UC->>Fold: FieldResult[]
   Fold-->>UC: pass | fail | needs_review
   UC-->>Route: VerificationResult
+  Route->>Telemetry: recordVerification
   Route-->>Client: { data, requestId }
 ```
 
-A thrown `PublicApiError` (or subclass) becomes `{ error: { code, message }, requestId }`. Anything else becomes `INTERNAL_ERROR`. Stack traces, image bytes, and full application data never leave the error presenter.
+A thrown `PublicApiError` (or subclass) becomes `{ error: { code, message }, requestId }`. Anything else becomes `INTERNAL_ERROR`. Stack traces, image bytes, and full application data never leave the error presenter. The same mapping (`toApiErrorCode`) is what telemetry records as `errorCode`.
 
 ---
 
@@ -98,11 +104,12 @@ A thrown `PublicApiError` (or subclass) becomes `{ error: { code, message }, req
 | --- | --- | --- |
 | HTTP adapter | Parse, request IDs, envelopes, composition | `app/api/verifications/route.ts`, `app/api/health/route.ts`, `server/verification-request.ts`, `server/http.ts` |
 | Use case | One verification, no HTTP, no vendor | `usecases/cross-check-label.ts` |
-| Port | Need, not technology | `usecases/ports/label-scanner.ts` (`LabelScanner`, `LabelImage`) |
+| Port | Need, not technology | `usecases/ports/label-scanner.ts` (`LabelScanner`, `LabelImage`), `usecases/ports/telemetry.ts` (`Telemetry`, `VerificationEvent`) |
 | Scanner adapters | Prompts, SDKs, stubs, provider-output validation | `adapters/unread-label-scanner.ts`, `adapters/stub-label-scanner.ts`, `adapters/vision-label-scanner.ts`, `adapters/vision-label-response.ts` |
+| Telemetry adapter | One sanitized JSON log line | `adapters/console-telemetry.ts` |
 | Domain | Types, TTB rules, matching, outcome | `domain/application.ts`, `domain/extracted-label.ts`, `domain/verification.ts`, `domain/verification-rules.ts`, `domain/normalizers.ts`, `domain/field-matchers.ts`, `domain/overall-outcome.ts` |
 
-`LabelImage` lives on the port so the upload guard and the scanner share one shape. The route is the only composition point: it chooses which `LabelScanner` to inject.
+`LabelImage` lives on the port so the upload guard and the scanner share one shape. The route is the only composition point: it chooses which `LabelScanner` and `Telemetry` to inject. It times the whole request (`durationMs`) and the provider `scan` (`scanDurationMs`) so provider latency can be compared to the five-second typical-result target without aborting at five seconds. The provider timeout is 10s.
 
 ---
 
@@ -244,7 +251,7 @@ All three satisfy `scan(image, application) → ExtractedLabel`. Absent or illeg
 | --- | --- |
 | `unreadLabelScanner` | Offline fallback. Ignores the image, reports everything unreadable at `low` confidence → overall `needs_review`. |
 | `stubLabelScanner` | Tests. Echoes application values as readable `match`s; default warning is the TTB heading/body with bold heading. Per-field overrides force other evidence. |
-| `visionLabelScanner` | Live Claude vision adapter. Prompt + image + expected fields; structured output parsed by `parseVisionResponse`. Timeouts/retries live here (`5s`, one retry). |
+| `visionLabelScanner` | Live Claude vision adapter. Prompt + image + expected fields; structured output parsed by `parseVisionResponse`. Timeouts/retries live here (`10s`, one retry). Typical results should return in about 5s; that is a target, not the abort. |
 
 ---
 

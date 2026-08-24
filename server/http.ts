@@ -81,6 +81,15 @@ export function errorResponse(
   );
 }
 
+export function toApiErrorCode(error: unknown): ApiErrorCode {
+  /*
+   * Known PublicApiError codes pass through. Anything else is INTERNAL_ERROR
+   * so stack traces and provider payloads never become a public code.
+   */
+  if (error instanceof PublicApiError) return error.code;
+  return "INTERNAL_ERROR";
+}
+
 export function toErrorResponse(
   error: unknown,
   requestId: string,
@@ -88,11 +97,5 @@ export function toErrorResponse(
   error: { code: ApiErrorCode; message: string };
   requestId: string;
 }> {
-  /*
-   * Map known failures to their public codes. Unexpected values become
-   * INTERNAL_ERROR so stack traces, provider payloads, and request data
-   * are never returned.
-   */
-  if (error instanceof PublicApiError) return errorResponse(error.code, requestId);
-  return errorResponse("INTERNAL_ERROR", requestId);
+  return errorResponse(toApiErrorCode(error), requestId);
 }

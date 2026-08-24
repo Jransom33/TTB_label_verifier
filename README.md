@@ -12,7 +12,7 @@ npm run lint
 npm run build
 ```
 
-Copy `.env.example` to `.env.local` and set `ANTHROPIC_API_KEY` plus `ANTHROPIC_MODEL` (a Claude model that accepts images and structured outputs). The live route calls `api.anthropic.com:443`; allow that outbound path. Each provider call uses a 5s timeout and one retry for transient failures.
+Copy `.env.example` to `.env.local` and set `ANTHROPIC_API_KEY` plus `ANTHROPIC_MODEL` (a Claude model that accepts images and structured outputs). The live route calls `api.anthropic.com:443`; allow that outbound path. Each provider call uses a 10s timeout and one retry for transient failures. Typical single-label results should return in about 5 seconds; the 10s timeout is a hard abort, not that target.
 
 Optional limits: `MAX_IMAGE_BYTES` (default 10 MB) and `MAX_REQUEST_BYTES` (default image limit + 1 MB).
 
@@ -76,6 +76,20 @@ Success:
 The live route sends the image to Claude. Confidence is Claude's own `low` / `medium` /
 `high` judgment, not a numeric score; treat it as uncalibrated. Automated tests mock the
 SDK and never call Anthropic.
+
+Each verification logs one JSON line (`console.info`) with only:
+
+```json
+{
+  "requestId": "11111111-1111-1111-1111-111111111111",
+  "durationMs": 4106,
+  "scanDurationMs": 4073,
+  "outcome": "pass",
+  "errorCode": null
+}
+```
+
+`durationMs` is the whole request. `scanDurationMs` is the provider `scan` (or `null` if the upload never reached the scanner). `outcome` is `pass` / `fail` / `needs_review` on success and `null` on failure. `errorCode` is the public API code on failure and `null` on success. Images, application data, secrets, and raw provider payloads are not logged.
 
 Manual smoke test (requires credentials and a real label image):
 

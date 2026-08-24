@@ -57,7 +57,7 @@ Still unconfirmed: additional visual warning rules and representative accuracy t
 
 ## Component list
 
-Listed in the order they should be completed. Each entry names its layer and the one reason it changes. Components 1 through 12 are done; 13 onward is the remaining work in dependency order.
+Listed in the order they should be completed. Each entry names its layer and the one reason it changes. Components 1 through 13 are done; 14 onward is the remaining work in dependency order.
 
 ### 1. Verification vocabulary — entity — complete
 
@@ -193,16 +193,21 @@ Changes when the vendor changes. Deliberately late: it is the component most lik
 Done:
 
 - `visionLabelScanner` implements the component 6 port. It is the only code that knows Anthropic exists.
-- Owns prompt construction and isolation, the Claude call, a 5s timeout, one bounded retry, and structured-output validation so a malformed or invented reply never reaches the matchers.
+- Owns prompt construction and isolation, the Claude call, a 10s timeout, one bounded retry, and structured-output validation so a malformed or invented reply never reaches the matchers. Typical results should return in about five seconds; the timeout is a hard abort, not that target.
 - The prompt asks for a per-field verdict against supplied application data. Validation rejects unknown, duplicate, or omitted fields, and rejects a verdict on a field that was not actually read.
 - Omitted optional application fields are filled locally as `missing` / `high` so Claude never judges data it was not given.
 - Timeouts map to `PROVIDER_TIMEOUT`. Known API, configuration, and invalid-response failures map to `PROVIDER_UNAVAILABLE`. Unexpected defects stay unsanitized until the HTTP presenter maps them to `INTERNAL_ERROR`.
 
-### 13. Telemetry port — port — not started
+### 13. Telemetry port — port — complete
 
 Meaningful once a real provider call exists whose latency can be measured against the five-second target.
 
-Remaining: a narrow logging interface for sanitized latency, outcome counts, and diagnostics. Keeping it narrow is what prevents images, full application data, secrets, and raw provider payloads from ever being loggable. Timeout handling and performance measurements against the five-second target land here too; the security controls that shipped with components 3 and 5 are already done.
+Done:
+
+- `Telemetry` port and `VerificationEvent` in `usecases/ports/telemetry.ts`. The event type is the security control: only request ID, whole-request duration, scan duration, outcome, and a public error code. Images, application data, secrets, and raw provider payloads have no field to occupy.
+- `consoleTelemetry` logs one JSON line by copying those fields by name, never by spreading the event object.
+- The verification route is the measurement point. It times the whole request (`durationMs`) and wraps `scan` (`scanDurationMs`, including failures; `null` if parse failed first), then records on both success and failure. Failure codes come from `toApiErrorCode`, the same mapping the HTTP presenter uses.
+- Five seconds is the typical-result target (NFR-1), measured here. The provider abort timeout stays at 10s so a slower call can still complete.
 
 ### 14. Cross-check batch — use case — not started
 
@@ -226,6 +231,7 @@ Done:
 Remaining:
 
 - Unit tests for validation helpers and warning rules.
+- Telemetry adapter and route-injection tests.
 - Batch tests.
 
 ## Deliberately excluded
