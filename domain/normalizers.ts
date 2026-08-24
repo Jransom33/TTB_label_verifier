@@ -23,5 +23,9 @@ export const normalizeText = (text: string): string =>
       .replace(/[^\p{L}\p{N}\s]/gu, " "),
   );
 
-// The warning has to be word for word, so we only undo the line wrapping and leave everything else alone.
+// Heading: word for word, including letter case. Only undo line wrapping.
 export const normalizeWarningText = collapseWhitespace;
+
+// Body: same wording, numbering, and punctuation; letter case does not matter.
+export const normalizeWarningBody = (text: string): string =>
+  collapseWhitespace(text).toLowerCase();

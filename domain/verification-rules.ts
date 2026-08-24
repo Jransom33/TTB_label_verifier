@@ -31,8 +31,9 @@ export type GovernmentWarningRule = {
 };
 
 /*
- * Version 1 uses the supplied warning wording. Line wrapping is treated as
- * formatting only; capitalization, numbering, wording, and punctuation remain exact.
+ * Version 1 uses the supplied warning wording. Line wrapping is formatting.
+ * The heading is case-sensitive; the body is exact on wording, numbering, and
+ * punctuation, regardless of letter case.
  */
 export const GOVERNMENT_WARNING_RULE = {
   version: "v1",

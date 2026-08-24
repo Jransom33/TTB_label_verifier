@@ -109,7 +109,7 @@ Error:
 ## Assumptions
 
 - Uploads are fully decoded with a 25 megapixel cap. Corrupt or truncated images return `INVALID_REQUEST` (400), not `UNSUPPORTED_MEDIA_TYPE` (415). Confirm both the cap and that error mapping.
-- Government warning rule `v1` requires the full warning in capitals, with a bold `GOVERNMENT WARNING:` heading, followed by the supplied standard warning wording. Line wrapping is ignored; wording, numbering, capitalization, and punctuation are exact.
+- Government warning rule `v1` requires a bold `GOVERNMENT WARNING:` heading, followed by the supplied standard warning wording. Line wrapping is ignored. Heading capitalization is exact; body wording, numbering, and punctuation are exact, but letter case is not.
 
 ## Original assignment brief
 

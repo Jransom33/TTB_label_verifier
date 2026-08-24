@@ -3,6 +3,7 @@
 import {
   useEffect,
   useId,
+  useMemo,
   useRef,
   useState,
   type DragEvent,
@@ -13,7 +14,8 @@ const ACCEPT = ".png,.jpg,.jpeg";
 const MAX_BYTES = 10 * 1024 * 1024;
 
 type LabelImageUploadProps = {
-  onFileChange?: (file: File | null) => void;
+  file: File | null;
+  onFileChange: (file: File | null) => void;
 };
 
 /**
@@ -32,14 +34,22 @@ function validateImage(file: File): string | null {
   return null;
 }
 
-export function LabelImageUpload({ onFileChange }: LabelImageUploadProps) {
+export function LabelImageUpload({ file, onFileChange }: LabelImageUploadProps) {
   const errorId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
   const dragCount = useRef(0);
-  const [file, setFile] = useState<File | null>(null);
-  const [preview, setPreview] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
+
+  // A stale validation error clears whenever the controlled file changes.
+  const [lastFile, setLastFile] = useState(file);
+  if (file !== lastFile) {
+    setLastFile(file);
+    setError(null);
+  }
+
+  // Preview mirrors the controlled file.
+  const preview = useMemo(() => (file ? URL.createObjectURL(file) : null), [file]);
 
   // Revoke each object URL when it is replaced, cleared, or the component unmounts.
   useEffect(() => {
@@ -51,21 +61,8 @@ export function LabelImageUpload({ onFileChange }: LabelImageUploadProps) {
 
   const applyFile = (next: File) => {
     const message = validateImage(next);
-    if (message) {
-      setError(message);
-      return;
-    }
-    setError(null);
-    setPreview(URL.createObjectURL(next));
-    setFile(next);
-    onFileChange?.(next);
-  };
-
-  const clearFile = () => {
-    setError(null);
-    setPreview(null);
-    setFile(null);
-    onFileChange?.(null);
+    if (message) setError(message);
+    else onFileChange(next);
   };
 
   const onDrop = (event: DragEvent<HTMLDivElement>) => {
@@ -147,7 +144,7 @@ export function LabelImageUpload({ onFileChange }: LabelImageUploadProps) {
           </p>
           <button
             type="button"
-            onClick={clearFile}
+            onClick={() => onFileChange(null)}
             className="rounded-full border border-white/15 px-3 py-1.5 text-sm text-white/90 hover:bg-white/5"
           >
             Clear

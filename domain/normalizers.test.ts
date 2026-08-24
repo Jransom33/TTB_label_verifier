@@ -1,4 +1,8 @@
-import { normalizeText, normalizeWarningText } from "@/domain/normalizers";
+import {
+  normalizeText,
+  normalizeWarningBody,
+  normalizeWarningText,
+} from "@/domain/normalizers";
 import { expect, test } from "vitest";
 
 /** Comparison-only cleanup: reported values are never rewritten. */
@@ -15,4 +19,14 @@ test("normalizeWarningText collapses whitespace only", () => {
   expect(normalizeWarningText("GOVERNMENT\nWARNING:")).toBe("GOVERNMENT WARNING:");
   expect(normalizeWarningText("Government warning:")).not.toBe("GOVERNMENT WARNING:");
   expect(normalizeWarningText("GOVERNMENT WARNING")).not.toBe("GOVERNMENT WARNING:");
+});
+
+/** Body comparison ignores letter case; wording and punctuation stay exact. */
+test("normalizeWarningBody collapses whitespace and folds case", () => {
+  expect(normalizeWarningBody("According\nto THE Surgeon General,")).toBe(
+    normalizeWarningBody("ACCORDING TO THE SURGEON GENERAL,"),
+  );
+  expect(normalizeWarningBody("ACCORDING TO THE SURGEON GENERAL")).not.toBe(
+    normalizeWarningBody("ACCORDING TO THE SURGEON GENERAL."),
+  );
 });

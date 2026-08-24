@@ -44,7 +44,7 @@ These were confirmed during implementation:
 - Code performs no unit or numeric conversion. It normalizes text and compares strings.
 - An exact match after normalization always yields `match`, even when the provider said mismatch. Otherwise the provider's verdict stands: equivalent but not identical is `needs_review`, and a rejected value is `mismatch`.
 - Field statuses are `match`, `needs_review`, `mismatch`, `missing`, and `unreadable`.
-- Government warning rule `v1` requires a bold `GOVERNMENT WARNING:` heading followed by: `(1) ACCORDING TO THE SURGEON GENERAL, WOMEN SHOULD NOT DRINK ALCOHOLIC BEVERAGES DURING PREGNANCY BECAUSE OF THE RISK OF BIRTH DEFECTS. (2) CONSUMPTION OF ALCOHOLIC BEVERAGES IMPAIRS YOUR ABILITY TO DRIVE A CAR OR OPERATE MACHINERY, AND MAY CAUSE HEALTH PROBLEMS.` The entire warning is all caps. Line wrapping is ignored, but wording, capitalization, numbering, and punctuation are exact.
+- Government warning rule `v1` requires a bold `GOVERNMENT WARNING:` heading followed by: `(1) ACCORDING TO THE SURGEON GENERAL, WOMEN SHOULD NOT DRINK ALCOHOLIC BEVERAGES DURING PREGNANCY BECAUSE OF THE RISK OF BIRTH DEFECTS. (2) CONSUMPTION OF ALCOHOLIC BEVERAGES IMPAIRS YOUR ABILITY TO DRIVE A CAR OR OPERATE MACHINERY, AND MAY CAUSE HEALTH PROBLEMS.` The heading is all caps. Line wrapping is ignored. Body wording, numbering, and punctuation are exact; letter case is not.
 - Correct warning wording under a heading that is not bold is `mismatch`.
 - Warning boldness that cannot be read is `needs_review`, not a pass-through status: the wording was already verified.
 - Among the two warning text pieces, `unreadable` outranks `missing`.
@@ -79,7 +79,7 @@ Changes when TTB changes, not when the code does.
 
 Done:
 
-- Versioned government warning wording plus heading capitalization, boldness, and whitespace rules.
+- Versioned government warning wording plus heading capitalization, boldness, and whitespace rules. Body letter case is ignored.
 - Exhaustive field-to-strategy metadata, now just `normalized_text` and `exact_warning`. Alcohol and volume no longer need strategies of their own, because the provider judges unit equivalence and code only compares normalized text.
 
 Remaining:
@@ -138,7 +138,8 @@ Pure functions in `domain/normalizers.ts`, called by the matchers and never by t
 Done:
 
 - `normalizeText` folds capitalization, accents, punctuation, and whitespace. It is used for comparison only; reported values are never rewritten. This is what makes `STONE'S THROW` agree with `Stone's Throw`, and `45% Alc./Vol.` agree with `45% ALC/VOL`.
-- `normalizeWarningText` collapses whitespace and nothing else, so warning wording, capitalization, numbering, and punctuation stay exact while line wrapping is ignored.
+- `normalizeWarningText` collapses whitespace and nothing else, so heading capitalization, numbering, and punctuation stay exact while line wrapping is ignored.
+- `normalizeWarningBody` collapses whitespace and folds case, so body wording, numbering, and punctuation stay exact while letter case does not matter.
 
 Deliberately excluded: unit and numeric conversion. ABV, proof, and volume equivalence is the provider's judgment, which keeps conversion tables and tolerances out of the codebase entirely.
 

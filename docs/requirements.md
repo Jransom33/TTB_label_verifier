@@ -33,7 +33,7 @@ Priority terms:
 - **FR-6 (Must):** Apply field-appropriate normalization before comparison. Harmless differences such as brand-name capitalization must not cause an automatic mismatch, while the original values remain available for review.
 - **FR-7 (Must):** Compare equivalent alcohol and volume representations correctly, such as ABV versus proof and equivalent volume units.
 - **FR-8 (Must):** Check that the complete, authoritative government health warning text is present and exact.
-- **FR-9 (Must):** Check that the entire government warning is all caps and that `GOVERNMENT WARNING:` is visually bold.
+- **FR-9 (Must):** Check that `GOVERNMENT WARNING:` is all caps and visually bold, and that the warning body matches the required wording exactly (letter case ignored).
 - **FR-10 (Must):** Distinguish among confirmed matches, confirmed mismatches, missing fields, and fields that cannot be read or verified reliably.
 - **FR-11 (Must):** Route uncertain, nuanced, or low-confidence comparisons to human review instead of returning a false pass or failure.
 - **FR-12 (Should):** Detect poor image quality, glare, rotation, or perspective issues and either compensate for them or explain that a clearer image is required.

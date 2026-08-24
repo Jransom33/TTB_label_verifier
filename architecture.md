@@ -221,7 +221,7 @@ flowchart TD
 
 **Normalized text** (`brandName`, `classType`, `alcoholContent`, `netContents`, `producer`, `countryOfOrigin`): fold case, accents, punctuation, and whitespace. No unit conversion. If the strings match after that, the field is `match` even when the provider said otherwise. If they differ, the provider's verdict stands: `match` → `needs_review`, `mismatch` → `mismatch`.
 
-**Exact warning**: collapse whitespace only. Heading and body must match `GOVERNMENT_WARNING_RULE` v1 exactly (caps, numbering, punctuation). Then:
+**Exact warning**: collapse whitespace. Heading must match `GOVERNMENT_WARNING_RULE` v1 exactly (caps, colon). Body must match wording, numbering, and punctuation; letter case is ignored. Then:
 
 - either text piece unreadable → `unreadable` (outranks missing)
 - both missing → `missing`

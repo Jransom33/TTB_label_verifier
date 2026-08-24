@@ -5,7 +5,11 @@ import {
   type JudgedField,
   type LabelField,
 } from "@/domain/extracted-label";
-import { normalizeText, normalizeWarningText } from "@/domain/normalizers";
+import {
+  normalizeText,
+  normalizeWarningBody,
+  normalizeWarningText,
+} from "@/domain/normalizers";
 import {
   FIELD_COMPARISON_RULES,
   GOVERNMENT_WARNING_RULE,
@@ -101,8 +105,8 @@ const matchWarning = (evidence: GovernmentWarningEvidence): FieldResult => {
   const wordingMatches =
     normalizeWarningText(heading.value) ===
       normalizeWarningText(GOVERNMENT_WARNING_RULE.heading) &&
-    normalizeWarningText(text.value) ===
-      normalizeWarningText(GOVERNMENT_WARNING_RULE.body);
+    normalizeWarningBody(text.value) ===
+      normalizeWarningBody(GOVERNMENT_WARNING_RULE.body);
 
   if (!wordingMatches) {
     return result("mismatch", extracted, heading.confidence, text.confidence);
