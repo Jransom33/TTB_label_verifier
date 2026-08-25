@@ -8,7 +8,7 @@ import { expect, test } from "vitest";
 const readable = <T,>(value: T) =>
   ({ status: "readable" as const, value, confidence: "high" as const });
 
-const matchWarning = (text: string, heading = GOVERNMENT_WARNING_RULE.heading) =>
+const matchWarning = (text: string, heading: string = GOVERNMENT_WARNING_RULE.heading) =>
   matchField({
     field: "governmentWarning",
     evidence: {

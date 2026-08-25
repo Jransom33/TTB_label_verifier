@@ -6,8 +6,11 @@
  * single-verification endpoint, four at a time. Per-item isolation, progress,
  * a summary, and retry of failed items all live here; the server is unchanged.
  */
-import { useMemo, useState, type ChangeEvent } from "react";
+import Image from "next/image";
+import { useEffect, useMemo, useState, type ChangeEvent } from "react";
+import { LABEL_EXAMPLES } from "@/components/label-examples";
 import { parseBatchCsv, type BatchCsvItem, type BatchCsvResult } from "@/components/parse-batch-csv";
+import tenutaError from "@/examples/Tenuta_gov_warning_error.png";
 import { runWithConcurrency } from "@/components/run-with-concurrency";
 import { CARD, StatusBadge, VerificationResults } from "@/components/verification-results";
 import type { VerificationResult } from "@/domain/verification";
@@ -15,6 +18,14 @@ import type { VerificationResult } from "@/domain/verification";
 // Four keeps well under provider rate limits while still overlapping requests.
 const CONCURRENCY_LIMIT = 4;
 const FALLBACK_ERROR = "The request could not be completed. Try again later.";
+
+// The bundled sample labels, shared with the single-label examples, plus the
+// warning-error variant that only the example batch CSV references.
+const EXAMPLE_IMAGES = [
+  ...LABEL_EXAMPLES.map(({ image, fileName }) => ({ image, fileName })),
+  { image: tenutaError, fileName: "Tenuta_gov_warning_error.png" },
+];
+const EXAMPLE_CSV_URL = "/batch-test.csv";
 
 // One runtime state per paired item; `done` holds a real verification result
 // (which may itself be a compliance fail), `error` means the request failed.
@@ -40,6 +51,7 @@ export function BatchVerification() {
   const [runs, setRuns] = useState<RunState[]>([]);
   const [expanded, setExpanded] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
+  const [exampleError, setExampleError] = useState<string | null>(null);
 
   // Pair CSV rows to selected images by exact filename, and surface both
   // unmatched rows and unused images before anything runs.
@@ -57,6 +69,20 @@ export function BatchVerification() {
     return { paired, unmatchedRows, unusedImages };
   }, [images, csv]);
 
+  // One object URL per selected image for the expanded-card preview. Object
+  // URLs are references to the picked Files, not copies, so 300 stay cheap;
+  // pixels are only decoded when a card is expanded and its image mounts.
+  const imageUrls = useMemo(
+    () => new Map(images.map((file) => [file.name, URL.createObjectURL(file)])),
+    [images],
+  );
+
+  // Revoke each batch of URLs when the selection changes or the component unmounts.
+  useEffect(
+    () => () => imageUrls.forEach((url) => URL.revokeObjectURL(url)),
+    [imageUrls],
+  );
+
   // Changing either input invalidates previous runs.
   const resetRuns = () => {
     setRuns([]);
@@ -72,6 +98,31 @@ export function BatchVerification() {
     const file = event.target.files?.[0];
     setCsv(file ? parseBatchCsv(await file.text()) : null);
     resetRuns();
+  };
+
+  // Loads the bundled sample images and example CSV as if the user picked them.
+  const loadExample = async () => {
+    if (busy) return;
+    setExampleError(null);
+    try {
+      const [csvText, files] = await Promise.all([
+        fetch(EXAMPLE_CSV_URL).then((response) => {
+          if (!response.ok) throw new Error();
+          return response.text();
+        }),
+        Promise.all(
+          EXAMPLE_IMAGES.map(
+            async ({ image, fileName }) =>
+              new File([await (await fetch(image.src)).blob()], fileName, { type: "image/png" }),
+          ),
+        ),
+      ]);
+      setImages(files);
+      setCsv(parseBatchCsv(csvText));
+      resetRuns();
+    } catch {
+      setExampleError(FALLBACK_ERROR);
+    }
   };
 
   // Runs the given item indices through the bounded pool. First runs pass all
@@ -123,6 +174,38 @@ export function BatchVerification() {
 
   return (
     <div className="w-full max-w-5xl space-y-6">
+      {/* Example batch, styled like the single-label examples. */}
+      <section>
+        <h2 className="text-sm font-medium text-forest/80">Try an example batch</h2>
+        <p className="mt-1 text-xs text-forest/50">
+          Click to load the sample labels and a CSV of six applications, including deliberate
+          mismatches.
+        </p>
+        <button
+          type="button"
+          onClick={loadExample}
+          disabled={busy}
+          className="mt-4 flex flex-wrap items-center gap-3 rounded-2xl border border-forest/15 p-3 transition-colors hover:border-forest/40 hover:bg-forest/5 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {EXAMPLE_IMAGES.map(({ image, fileName }) => (
+            <Image
+              key={fileName}
+              src={image}
+              alt={fileName}
+              sizes="80px"
+              className="h-20 w-16 rounded-xl object-contain"
+            />
+          ))}
+          <span className="px-2 text-sm text-forest/70">Load example batch</span>
+        </button>
+        {exampleError ? (
+          <p role="alert" className="mt-3 text-sm text-red-600">
+            {exampleError}
+          </p>
+        ) : null}
+        <hr className="mt-8 border-forest/10" />
+      </section>
+
       {/* Inputs: the images and the CSV that pairs application data to them. */}
       <div className={CARD}>
         <h2 className="font-serif text-2xl tracking-tight">Verify a batch</h2>
@@ -221,8 +304,19 @@ export function BatchVerification() {
                 {run?.state === "error" && (
                   <p className="mt-2 text-xs text-red-300">{run.message}</p>
                 )}
+                {/* Expanded: the label image beside its results, like the single form.
+                    The image only mounts (and decodes) when its card is opened. */}
                 {run?.state === "done" && expanded === index && (
-                  <div className="mt-4">
+                  <div className="mt-4 grid items-start gap-4 lg:grid-cols-2">
+                    <div className="rounded-2xl bg-black/20 lg:sticky lg:top-8">
+                      {/* Blob previews are local object URLs; next/image is not a fit here. */}
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={imageUrls.get(item.imageFileName)}
+                        alt={item.imageFileName}
+                        className="max-h-128 w-full object-contain p-3"
+                      />
+                    </div>
                     <VerificationResults result={run.result} />
                   </div>
                 )}
