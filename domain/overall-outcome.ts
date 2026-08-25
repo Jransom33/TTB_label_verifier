@@ -22,8 +22,6 @@ const SEVERITY = ["fail", "needs_review", "pass"] as const;
  * Fold field statuses and confidences into one outcome.
  * Low confidence is never decisive; among the rest, fail beats needs_review
  * which beats pass. An empty list cannot pass.
- *
- * Assumption: `medium` and `high` are equally decisive; only `low` is gated.
  */
 export const overallOutcome = (fields: FieldResult[]): VerificationOutcome => {
   // A low-confidence reading is never decisive, whatever it claimed.

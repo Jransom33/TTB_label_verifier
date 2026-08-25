@@ -2,7 +2,7 @@ import Image, { type StaticImageData } from "next/image";
 import type { ApplicationData } from "@/domain/application";
 import sakura from "@/examples/Sakura_sake.png";
 import tenuta from "@/examples/Tenuta_wine.png";
-import oldTom from "@/examples/uncle_toms_distillery.png";
+import oldTom from "@/examples/old_toms_distillery.png";
 
 // Bundled sample labels with the application values each one should match.
 export const LABEL_EXAMPLES = [
@@ -23,7 +23,7 @@ export const LABEL_EXAMPLES = [
     id: "old-tom",
     name: "Old Tom Distillery",
     image: oldTom,
-    fileName: "uncle_toms_distillery.png",
+    fileName: "old_toms_distillery.png",
     applicationData: {
       brandName: "OLD TOM DISTILLERY",
       classType: "KENTUCKY STRAIGHT BOURBON WHISKEY",

@@ -1,8 +1,12 @@
 # Architecture
 
-Stateless Next.js backend that compares one alcohol label image to application data and returns a structured verdict. Nothing is persisted. Uncertain results go to human review; the service never autonomously approves or rejects a COLA.
+This document covers the server-side design: how a request flows through the code, where validation and the TTB rules live, and how the AI provider is kept at arm's length. For what the app does and how to use it — including the browser UI and batch mode — start with the [README](README.md). The UI only ever calls the one verification endpoint described here, so everything below applies to single and batch runs alike.
 
-Dependencies only point inward: adapters know about use cases, use cases know about domain types, domain imports nothing outside `domain/`.
+The server is stateless: it compares one label image against one application's data, returns a structured verdict, and keeps nothing. Uncertain results are routed to human review.
+
+## Layers
+
+The code is split into three layers, and dependencies only point inward: adapters know about use cases, use cases know about domain types, and the domain imports nothing outside `domain/`. That is what keeps the moving parts swappable — the AI provider, the HTTP handling, and the logging can each change without touching a rule.
 
 ```mermaid
 flowchart TB
@@ -24,12 +28,12 @@ flowchart TB
     TelemetryPort["Telemetry port<br/>recordVerification"]
   end
 
-  subgraph domain ["Entities (rules + vocabulary)"]
+  subgraph domain ["Domain (rules + vocabulary)"]
     App["ApplicationData<br/>applicationDataSchema"]
     Extracted["ExtractedLabel / JudgedField"]
     Rules["FIELD_COMPARISON_RULES<br/>GOVERNMENT_WARNING_RULE"]
     Match["matchField"]
-    Norm["normalizeText / normalizeWarningText"]
+    Norm["normalizeText / warning normalizers"]
     Outcome["overallOutcome"]
     Result["VerificationResult"]
   end
@@ -56,9 +60,20 @@ flowchart TB
   Outcome --> Result
 ```
 
-The live route injects `visionLabelScanner` and `consoleTelemetry`. Tests drive the pipeline with `stubLabelScanner` and keep `unreadLabelScanner` as an offline fallback.
 
----
+
+
+| Layer             | Responsibility                                                                                      | Files                                                                                                                                         |
+| ----------------- | --------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| HTTP adapter      | Parse requests, assign request IDs, shape success/error responses, wire the pieces together         | `app/api/verifications/route.ts`, `app/api/health/route.ts`, `server/verification-request.ts`, `server/http.ts`                               |
+| Use case          | Run one verification end to end; knows nothing about HTTP or any vendor                             | `usecases/cross-check-label.ts`                                                                                                               |
+| Ports             | The two interfaces the use case depends on, free of any technology choice                           | `usecases/ports/label-scanner.ts`, `usecases/ports/telemetry.ts`                                                                              |
+| Scanner adapters  | Everything provider-specific: the prompt, the SDK call, reply validation, and the offline stand-ins | `adapters/vision-label-scanner.ts`, `adapters/vision-label-response.ts`, `adapters/stub-label-scanner.ts`, `adapters/unread-label-scanner.ts` |
+| Telemetry adapter | One sanitized JSON log line per verification                                                        | `adapters/console-telemetry.ts`                                                                                                               |
+| Domain            | The TTB rulebook: types, warning wording, normalizers, field matching, the outcome rule             | `domain/*.ts`                                                                                                                                 |
+
+
+The route is the only composition point — it decides which `LabelScanner` and `Telemetry` to inject. Production gets `visionLabelScanner` and `consoleTelemetry`; tests inject `stubLabelScanner`, which echoes the application values instead of reading pixels. The route also times the whole request (`durationMs`) and the provider call alone (`scanDurationMs`), so provider latency can be tracked against the roughly five-second usability target. That target is not strictly enforced; the hard abort is the provider's 10-second timeout.
 
 ## Request path
 
@@ -94,26 +109,11 @@ sequenceDiagram
   Route-->>Client: { data, requestId }
 ```
 
-A thrown `PublicApiError` (or subclass) becomes `{ error: { code, message }, requestId }`. Anything else becomes `INTERNAL_ERROR`. Stack traces, image bytes, and full application data never leave the error presenter. The same mapping (`toApiErrorCode`) is what telemetry records as `errorCode`.
 
----
 
-## Layers and files
+Error handling follows one rule: any thrown `PublicApiError` becomes `{ error: { code, message }, requestId }` with its mapped HTTP status, and anything else becomes a generic `INTERNAL_ERROR` (500). Provider failures are translated inside the vision adapter: a timeout becomes `PROVIDER_TIMEOUT` (504), while SDK errors, missing provider configuration, and malformed replies become `PROVIDER_UNAVAILABLE` (503). Stack traces, image bytes, and application data never appear in a response, and telemetry records only the public error code.
 
-| Layer | Owns | Files |
-| --- | --- | --- |
-| HTTP adapter | Parse, request IDs, envelopes, composition | `app/api/verifications/route.ts`, `app/api/health/route.ts`, `server/verification-request.ts`, `server/http.ts` |
-| Use case | One verification, no HTTP, no vendor | `usecases/cross-check-label.ts` |
-| Port | Need, not technology | `usecases/ports/label-scanner.ts` (`LabelScanner`, `LabelImage`), `usecases/ports/telemetry.ts` (`Telemetry`, `VerificationEvent`) |
-| Scanner adapters | Prompts, SDKs, stubs, provider-output validation | `adapters/unread-label-scanner.ts`, `adapters/stub-label-scanner.ts`, `adapters/vision-label-scanner.ts`, `adapters/vision-label-response.ts` |
-| Telemetry adapter | One sanitized JSON log line | `adapters/console-telemetry.ts` |
-| Domain | Types, TTB rules, matching, outcome | `domain/application.ts`, `domain/extracted-label.ts`, `domain/verification.ts`, `domain/verification-rules.ts`, `domain/normalizers.ts`, `domain/field-matchers.ts`, `domain/overall-outcome.ts` |
-
-`LabelImage` lives on the port so the upload guard and the scanner share one shape. The route is the only composition point: it chooses which `LabelScanner` and `Telemetry` to inject. It times the whole request (`durationMs`) and the provider `scan` (`scanDurationMs`) so provider latency can be compared to the five-second typical-result target without aborting at five seconds. The provider timeout is 10s.
-
----
-
-## Types: what each object is for
+## The types, from request to result
 
 ```mermaid
 flowchart LR
@@ -131,85 +131,59 @@ flowchart LR
   VR --- LI
 ```
 
-**`ApplicationData`** — declared values from the form JSON. Required: `brandName`, `classType`, `alcoholContent`, `netContents`. Optional: `producer`, `countryOfOrigin`. `classType` is the designation on the label.
 
-**`LabelImage`** — trusted in-memory bytes plus `image/jpeg` or `image/png`. Filename is discarded after validation.
 
-**`ExtractedLabel`** — what a scanner saw, not a verdict for the client.
+- `ApplicationData` — the declared values from the form JSON. `brandName`, `classType`, `alcoholContent`, and `netContents` are required; `producer` and `countryOfOrigin` are optional. `classType` is the class/type designation as printed on the label.
+- `LabelImage` — validated in-memory image bytes plus their media type (`image/jpeg` or `image/png`). The untrusted filename is discarded during validation. The type lives on the scanner port so the upload guard and every scanner share one shape.
+- `ExtractedLabel` — what a scanner saw, before any rules run. `fields` is a total record: all six keys exist even when the application omitted an optional. `governmentWarning` carries three separate pieces of evidence — heading text, body text, and whether the heading looks bold.
+- `JudgedField` — one field's evidence: a status (`readable` / `missing` / `unreadable`), a value only when readable, and — only when readable — the provider's opinion (`match` / `mismatch`). The types make illegal states unrepresentable: a field that was never read cannot carry a value or a verdict. Confidence is categorical (`low` / `medium` / `high`).
+- `FieldResult` — one public row: `expected`, `extracted`, `status`, `confidence`, `explanation`. Reported strings are always the originals; normalized copies exist only for comparison and are never returned.
+- `VerificationResult` — the overall `outcome` plus the field rows, derived only from statuses and confidences, never from label text directly.
 
-- `fields`: a total `Record<LabelField, JudgedField>`. Every key exists even if the application omitted an optional.
-- `governmentWarning`: three evidence pieces (`heading`, `text`, `headingIsBold`). Boldness is visual evidence, not a provider match/mismatch verdict.
 
-**`JudgedField`** — evidence plus, when readable, a `FieldVerdict` (`match` | `mismatch`). TypeScript forbids a verdict on `missing` / `unreadable` evidence, so a field that was never read cannot be judged.
-
-**`FieldResult`** — public per-field row: `expected`, `extracted`, `status`, `confidence`, `explanation`. Reported strings are the originals; normalized copies are comparison-only and never returned.
-
-**`VerificationResult`** — `outcome` plus the field list. Outcome is derived from statuses and confidences only, never from label text.
-
-Field-name unions:
-
-- `LabelField` — the six application-backed keys (`brandName` … `countryOfOrigin`)
-- `VerificationField` — those six plus `governmentWarning`
-
----
 
 ## Where validation happens
 
-Validation is split on purpose. The HTTP guard rejects bad *requests*. The vision adapter rejects bad *provider replies*. The matchers decide whether two *values* agree. They are not the same job.
+Validation is split across three gates because they are three different jobs: the HTTP guard rejects bad requests, the domain schema rejects bad application data, and the vision adapter rejects bad provider replies. By the time `matchField` compares two values, both sides have already been validated.
 
 ### 1. Upload guard — `server/verification-request.ts`
 
-Runs before the use case and before any scanner. Failures are `RequestValidationError` → public HTTP codes.
+Runs before the use case and before any scanner. Failures throw `RequestValidationError`, which maps to public HTTP codes:
 
-| Check | Failure |
-| --- | --- |
-| `Content-Type` is `multipart/form-data` | `UNSUPPORTED_MEDIA_TYPE` (415) |
-| Body size vs `MAX_REQUEST_BYTES` (default image limit + 1 MB) | `PAYLOAD_TOO_LARGE` (413) |
-| Exactly one `image` file and one `applicationData` text field | `INVALID_REQUEST` (400) |
-| Extension `.png` / `.jpg` / `.jpeg`, MIME matches extension | `UNSUPPORTED_MEDIA_TYPE` |
-| File size vs `MAX_IMAGE_BYTES` (default 10 MB); empty files | 413 / 400 |
-| PNG/JPEG magic bytes match the declared type | `UNSUPPORTED_MEDIA_TYPE` |
-| Full decode via sharp, 25 megapixel cap | `INVALID_REQUEST` |
 
-### 2. Application JSON schema — `domain/application.ts`
+| Check                                                          | Failure                        |
+| -------------------------------------------------------------- | ------------------------------ |
+| `Content-Type` is `multipart/form-data`                        | `UNSUPPORTED_MEDIA_TYPE` (415) |
+| Body size vs `MAX_REQUEST_BYTES` (default: image limit + 1 MB) | `PAYLOAD_TOO_LARGE` (413)      |
+| Exactly one `image` file and one `applicationData` text field  | `INVALID_REQUEST` (400)        |
+| Extension `.png` / `.jpg` / `.jpeg`, MIME matches extension    | `UNSUPPORTED_MEDIA_TYPE`       |
+| File size vs `MAX_IMAGE_BYTES` (default 10 MB); empty files    | 413 / 400                      |
+| PNG/JPEG magic bytes match the declared type                   | `UNSUPPORTED_MEDIA_TYPE`       |
+| Full decode via sharp, 25-megapixel cap                        | `INVALID_REQUEST`              |
 
-`parseApplicationData` JSON-parses the form field, then `applicationDataSchema.safeParse`. The schema lives in domain so HTTP and tests share one contract.
 
-- `strict()`: unknown keys rejected
-- strings trimmed; blanks rejected; max lengths enforced
-- `producer` and `countryOfOrigin` optional, but if present they must be non-blank
 
-Malformed JSON and schema failures both become `INVALID_REQUEST`. No field-level error details are returned.
+
+### 2. Application data — `domain/application.ts`
+
+The guard JSON-parses the `applicationData` form field and validates it with `applicationDataSchema` (Zod, `strict()`), which lives in the domain so HTTP code and tests share one contract. Strings are trimmed, blanks rejected, and max lengths enforced; unknown keys are rejected. Malformed JSON and schema failures both surface as `INVALID_REQUEST` with no field-level detail.
 
 ### 3. Provider output — `adapters/vision-label-response.ts`
 
-`visionOutputFormat` is the Anthropic structured-output schema. `parseVisionResponse` then enforces domain invariants the JSON schema cannot:
+`visionOutputFormat` is the structured-output schema sent to Claude. `parseVisionResponse` then enforces the invariants a JSON schema cannot:
 
-- Zod shape: statuses, confidence categories, verdicts, warning evidence
-- readable evidence must have a non-blank value and a verdict
-- missing/unreadable evidence must have `value: null` and `verdict: null`
-- exactly the fields the application supplied, no extras, no duplicates
-- omitted optionals are filled as `missing` so `ExtractedLabel.fields` stays a total record
+- readable evidence must have a non-blank value and a verdict; missing or unreadable evidence must have `value: null` and `verdict: null`
+- every field the application supplied must appear exactly once — duplicates are rejected, fields the application never asked about are ignored, and omitted optionals are filled in as `missing` so the record stays total
 
-A malformed reply throws `InvalidVisionResponseError` and never reaches `matchField`. Route-level mapping of that error (and Claude timeouts) is still follow-up work.
+A reply that fails any of this throws `InvalidVisionResponseError`, which the scanner maps to `PROVIDER_UNAVAILABLE`. It never reaches the matching rules.
 
-### 4. Type-level constraints — `domain/extracted-label.ts`
+## How a field gets its status
 
-`ExtractedEvidence` makes `value` null unless status is `readable`. `JudgedField` only attaches `verdict` to readable evidence. Confidence is categorical (`low` / `medium` / `high`); numeric provider scores, when they exist, are mapped in the adapter.
+`crossCheckLabel` scans the image once, then:
 
-### 5. Matching is comparison, not input validation — `domain/field-matchers.ts`
-
-`matchField` assumes both sides already passed the gates above. It does not parse HTTP or provider JSON.
-
----
-
-## How a field becomes a status
-
-`crossCheckLabel` scans once, then:
-
-1. For each `LABEL_FIELDS` key that the application actually supplied, call `matchField` with the expected string and that field's `JudgedField`. Omitted optionals are dropped (`flatMap`), so they cannot fail the request.
-2. Always match `governmentWarning`. Its expected wording comes from `GOVERNMENT_WARNING_RULE`, not from the application.
-3. Fold the `FieldResult[]` with `overallOutcome`.
+1. For each field the application actually supplied, calls `matchField` with the expected string and the scanner's evidence. Omitted optionals are skipped entirely, so they can never fail a request.
+2. Always checks `governmentWarning` — TTB requires it on every label, and its expected wording comes from the versioned `GOVERNMENT_WARNING_RULE`, not from the application.
+3. Folds the results into one outcome with `overallOutcome`.
 
 ```mermaid
 flowchart TD
@@ -223,44 +197,35 @@ flowchart TD
   Verdict -->|match| Review["status = needs_review<br/>equivalent but not identical"]
   Verdict -->|mismatch| Mismatch["status = mismatch"]
 
-  Strategy -->|exact_warning| Warn
+  Strategy -->|exact_warning| Warn["government warning rule (below)"]
 ```
 
-**Normalized text** (`brandName`, `classType`, `alcoholContent`, `netContents`, `producer`, `countryOfOrigin`): fold case, accents, punctuation, and whitespace. No unit conversion. If the strings match after that, the field is `match` even when the provider said otherwise. If they differ, the provider's verdict stands: `match` → `needs_review`, `mismatch` → `mismatch`.
 
-**Exact warning**: collapse whitespace. Heading must match `GOVERNMENT_WARNING_RULE` v1 exactly (caps, colon). Body must match wording, numbering, and punctuation; letter case is ignored. Then:
+
+**Text fields** (all six application-backed fields): both sides go through `normalizeText`, which folds case and accents, turns punctuation into spaces, and collapses whitespace — no unit conversion. If the strings are identical after that, the status is `match`, even if the provider disagreed. If they differ, the provider's opinion decides: `match` becomes `needs_review` (equivalent but not identical, so a human confirms), and `mismatch` stays `mismatch`.
+
+**Government warning**: the heading must equal `GOVERNMENT WARNING:` exactly, caps and colon included — `normalizeWarningText` only collapses whitespace. The body must match the standard wording, numbering, and punctuation; `normalizeWarningBody` also lowercases, so letter case and line wrapping are the only tolerated differences. Then:
 
 - either text piece unreadable → `unreadable` (outranks missing)
-- both missing → `missing`
+- both pieces missing → `missing`
 - wording wrong → `mismatch`
 - wording right, boldness unreadable → `needs_review`
 - wording right, heading not bold → `mismatch`
 - wording right, heading bold → `match`
 
-`expected` / `extracted` for the warning are heading and body joined with one space. `explanation` is `null` on `match` and a fixed sentence otherwise.
+The warning row's `expected` / `extracted` join heading and body with one space, and its confidence is the lowest among the evidence pieces involved. For every field, `explanation` is `null` on `match` and a fixed sentence otherwise.
 
-**Overall outcome** (`domain/overall-outcome.ts`): `low` confidence is never decisive (treated as `needs_review`). Among the rest, `fail` > `needs_review` > `pass`. Status map: `match` → pass; `mismatch` / `missing` → fail; `needs_review` / `unreadable` → needs_review. An empty field list is `needs_review`.
+**Overall outcome** (`domain/overall-outcome.ts`): each field maps to `pass` (`match`), `fail` (`mismatch`, `missing`), or `needs_review` (`needs_review`, `unreadable`) — except that a `low`-confidence field always counts as `needs_review` whatever its status, so a shaky reading can never decide the result. The most severe outcome wins (`fail` > `needs_review` > `pass`), and an empty field list is `needs_review`.
 
----
+## The three scanners
 
-## Scanner implementations of `LabelScanner`
+All implement `LabelScanner.scan(image, application) → ExtractedLabel`. Absent or illegible text is evidence (`missing` / `unreadable`), not an error; a rejected promise means the provider itself failed.
 
-All three satisfy `scan(image, application) → ExtractedLabel`. Absent or illegible text is evidence (`missing` / `unreadable`), not an error. A rejected promise means the provider itself failed.
 
-| Adapter | Role |
-| --- | --- |
-| `unreadLabelScanner` | Offline fallback. Ignores the image, reports everything unreadable at `low` confidence → overall `needs_review`. |
-| `stubLabelScanner` | Tests. Echoes application values as readable `match`s; default warning is the TTB heading/body with bold heading. Per-field overrides force other evidence. |
-| `visionLabelScanner` | Live Claude vision adapter. Prompt + image + expected fields; structured output parsed by `parseVisionResponse`. Timeouts/retries live here (`10s`, one retry). Typical results should return in about 5s; that is a target, not the abort. |
+| Adapter              | Role                                                                                                                                                                                                                            |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `visionLabelScanner` | The live one. Sends the image, the expected values, and a prompt to Claude; the structured reply is validated by `parseVisionResponse`. 10-second timeout, one retry, provider failures mapped to the public error codes above. |
+| `stubLabelScanner`   | For tests. Echoes application values back as readable matches, with the correct bold warning by default; per-field overrides force any other evidence.                                                                          |
+| `unreadLabelScanner` | Offline fallback used in tests. Ignores the image and reports every field unreadable at `low` confidence, which lands on `needs_review`.                                                                                        |
 
----
 
-## Verbs (one per pipeline step)
-
-| Verb | Function | Input → output |
-| --- | --- | --- |
-| `scan` | `LabelScanner.scan` | image + application → `ExtractedLabel` |
-| `normalize` | `normalizeText` / `normalizeWarningText` | one string → comparison string |
-| `matchField` | field matchers | expected + evidence → `FieldResult` |
-| `overallOutcome` | outcome fold | `FieldResult[]` → `pass` / `fail` / `needs_review` |
-| `crossCheckLabel` | use case | `VerificationRequest` → `VerificationResult` |

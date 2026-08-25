@@ -1,14 +1,9 @@
 import {
-  CONFIDENCE_LEVELS,
-  type ExtractedField,
-} from "@/domain/extracted-label";
-import {
   FIELD_COMPARISON_RULES,
   GOVERNMENT_WARNING_RULE,
   VERIFICATION_FIELDS,
 } from "@/domain/verification-rules";
 import { expect, test } from "vitest";
-
 
 /** Runtime rule keys and compile-time `satisfies` keep field coverage exhaustive. */
 test("defines one comparison strategy for every verification field", () => {

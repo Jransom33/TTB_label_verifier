@@ -36,24 +36,11 @@ export const StatusBadge = ({ status }: { status: FieldStatus | VerificationOutc
   </span>
 );
 
-export function VerificationResults({
-  result,
-  elapsedMs,
-}: {
-  result: VerificationResult;
-  elapsedMs?: number | null;
-}) {
+export function VerificationResults({ result }: { result: VerificationResult }) {
   return (
     <section className={CARD}>
       <div className="flex items-center justify-between">
-        <h3 className="font-serif text-2xl tracking-tight">
-          Result
-          {elapsedMs != null && (
-            <span className="ml-2 text-sm font-sans text-white/40">
-              in {(elapsedMs / 1000).toFixed(1)}s
-            </span>
-          )}
-        </h3>
+        <h3 className="font-serif text-2xl tracking-tight">Result</h3>
         <StatusBadge status={result.outcome} />
       </div>
       <ul className="mt-4 space-y-3">

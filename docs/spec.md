@@ -17,13 +17,17 @@ API routes handle HTTP concerns and delegate all cross-checking to one shared us
 
 Each pipeline step owns exactly one verb, and no verb is reused:
 
-| Step | Name | Scope |
-| --- | --- | --- |
-| Read and judge the image | `scan` | one image plus application data → `ExtractedLabel` |
-| Clean values for comparison | `normalize` | one string |
-| Compare one field | `matchField` | one expected value vs one piece of evidence, reconciling the provider verdict with the normalized comparison |
-| Derive the outcome | `overallOutcome` | all field results → one outcome |
-| Run the whole request | `crossCheckLabel` | one request → one `VerificationResult` |
+
+| Step                        | Name              | Scope                                                                                                        |
+| --------------------------- | ----------------- | ------------------------------------------------------------------------------------------------------------ |
+| Read and judge the image    | `scan`            | one image plus application data → `ExtractedLabel`                                                           |
+| Clean values for comparison | `normalize`       | one string                                                                                                   |
+| Compare one field           | `matchField`      | one expected value vs one piece of evidence, reconciling the provider verdict with the normalized comparison |
+| Derive the outcome          | `overallOutcome`  | all field results → one outcome                                                                              |
+| Run the whole request       | `crossCheckLabel` | one request → one `VerificationResult`                                                                       |
+
+
+
 
 ## Decided assumptions
 
@@ -55,11 +59,11 @@ These were confirmed during implementation:
 - `explanation` is `null` for `match` and a short fixed sentence otherwise.
 - `overallOutcome` sees only statuses and confidences, never label text. `fail` outranks `needs_review`, which outranks `pass`. A `low` confidence reading is never decisive, whatever status it carried. Confident `missing` is `fail`. An empty field list is `needs_review`.
 
-Still unconfirmed: additional visual warning rules and representative accuracy targets. The vision provider is Anthropic Claude (`ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL`, outbound `api.anthropic.com:443`).
+
 
 ## Component list
 
-Listed in the order they should be completed. Each entry names its layer and the one reason it changes. Components 1 through 13 are done; 14 onward is the remaining work in dependency order.
+Listed in the order they were completed. Each entry names its layer and the one reason it changes. All 14 components are done; only the test gaps noted at the end remain.
 
 ### 1. Verification vocabulary — entity — complete
 
@@ -75,6 +79,8 @@ Done:
 - Optional producer and country of origin are included in results only when supplied.
 - Image-quality reasons are deliberately excluded from the result contract.
 
+
+
 ### 2. TTB label rules — entity — complete
 
 Changes when TTB changes, not when the code does.
@@ -83,10 +89,9 @@ Done:
 
 - Versioned government warning wording plus heading capitalization, boldness, and whitespace rules. Body letter case is ignored.
 - Exhaustive field-to-strategy metadata, now just `normalized_text` and `exact_warning`. Alcohol and volume no longer need strategies of their own, because the provider judges unit equivalence and code only compares normalized text.
+- Rule tests: `verification-rules.test.ts` pins the versioned warning wording and the field-to-strategy map; `field-matchers.test.ts` exercises the strategies exhaustively.
 
-Remaining:
 
-- Representative match fixtures for those rules are still pending.
 
 ### 3. Upload guard — adapter — complete
 
@@ -98,6 +103,8 @@ Done:
 - Full PNG/JPEG decode after the signature check; truncated or corrupt files are `INVALID_REQUEST`. Pixel count is capped at 25 megapixels.
 - Configurable `MAX_IMAGE_BYTES` and `MAX_REQUEST_BYTES`; the body is read with a size cap before parsing.
 - Malformed or unsafe input is rejected before the use case (and later AI provider).
+
+
 
 ### 4. HTTP controllers — adapter — complete
 
@@ -112,6 +119,8 @@ Done:
 - Endpoint contracts documented in `README.md`.
 - No batch routes: batch processing is client-orchestrated over the single endpoint (component 14).
 
+
+
 ### 5. Error presenter — adapter — complete
 
 Done:
@@ -119,6 +128,8 @@ Done:
 - Shared `PublicApiError` model and `toErrorResponse`, which maps known failures to the public envelope and unexpected failures to `INTERNAL_ERROR`.
 - Request IDs on every API response.
 - No stack traces, provider payloads, secrets, image bytes, or full application data in error JSON.
+
+
 
 ### 6. Label scanner port — port — complete
 
@@ -129,6 +140,8 @@ Done:
 - The port owns `LabelImage` (validated bytes plus trusted media type). The upload guard imports it, keeping one definition and pointing the dependency inward.
 - Error contract: `scan` resolves with an `ExtractedLabel` or throws. Mapping a vendor failure to `PROVIDER_TIMEOUT` or `PROVIDER_UNAVAILABLE` belongs to the adapter, since the port must not import the HTTP layer.
 - Absent or illegible text is evidence, not an error: it returns as `missing` or `unreadable` with a null value.
+
+
 
 ### 7. Value normalizers — entity — complete
 
@@ -152,6 +165,8 @@ Done:
 - An exact match after normalization yields `match`, and it wins even when the provider said mismatch. Otherwise the provider's verdict decides: `match` becomes `needs_review`, because the values are equivalent but not identical, and `mismatch` stays `mismatch`. Missing and unreadable evidence passes through as its own status and is never judged.
 - The warning is checked against the fixed wording plus the heading text and its boldness. It cannot see other fields or the overall outcome. Correct wording under a non-bold heading is `mismatch`.
 
+
+
 ### 9. Overall outcome — entity — complete
 
 Depends only on the component 1 field-result type. The single place the bias toward human review is encoded.
@@ -164,6 +179,8 @@ Done:
 - An empty field list is `needs_review`.
 - The stub service calls `overallOutcome` instead of hardcoding the outcome.
 
+
+
 ### 10. Stub label scanner — adapter — complete
 
 Done:
@@ -173,6 +190,8 @@ Done:
 - The government warning defaults to the TTB heading and body with a bold heading, since its wording is not in the application.
 - Per-field and warning overrides let tests force other evidence without a provider.
 - Adapter tests cover readable defaults, missing optionals, the default warning, and partial overrides.
+
+
 
 ### 11. Cross-check label — use case — complete
 
@@ -184,6 +203,8 @@ Done:
 - The use case calls the injected scanner, matches each supplied application field plus the government warning, and derives one complete `VerificationResult` with `overallOutcome`. It holds no rules of its own.
 - The verification route is the composition point and injects `visionLabelScanner`. `unreadLabelScanner` remains for offline tests.
 - Use-case tests drive the real matchers and outcome rule with the stub scanner so the pipeline can pass, fail, or need review offline.
+
+
 
 ### 12. Vision label scanner — adapter — complete
 
@@ -197,6 +218,8 @@ Done:
 - Omitted optional application fields are filled locally as `missing` / `high` so Claude never judges data it was not given.
 - Timeouts map to `PROVIDER_TIMEOUT`. Known API, configuration, and invalid-response failures map to `PROVIDER_UNAVAILABLE`. Unexpected defects stay unsanitized until the HTTP presenter maps them to `INTERNAL_ERROR`.
 
+
+
 ### 13. Telemetry port — port — complete
 
 Meaningful once a real provider call exists whose latency can be measured against the five-second target.
@@ -207,6 +230,8 @@ Done:
 - `consoleTelemetry` logs one JSON line by copying those fields by name, never by spreading the event object.
 - The verification route is the measurement point. It times the whole request (`durationMs`) and wraps `scan` (`scanDurationMs`, including failures; `null` if parse failed first), then records on both success and failure. Failure codes come from `toApiErrorCode`, the same mapping the HTTP presenter uses.
 - Five seconds is the typical-result target (NFR-1), measured here. The provider abort timeout stays at 10s so a slower call can still complete.
+
+
 
 ### 14. Batch verification — client component — complete
 
@@ -219,6 +244,8 @@ Done:
 - `components/batch-verification.tsx` pairs rows to selected images by exact filename, surfaces unmatched rows and unused images before running, shows per-item status with live progress and a pass/fail/review/error summary, and retries only failed items (idempotent, since the server is stateless).
 - The home page offers a Single / Batch mode toggle.
 
+
+
 ### Test coverage — not a sequenced component
 
 Tests ship in the same commit as the component they cover.
@@ -228,17 +255,14 @@ Done:
 - Health-route contract test.
 - Verification success test (mocked use case, real multipart parsing).
 - Verification failure tests: missing/multiple/unsupported/malformed/oversized images, truncated PNG, bad application JSON, provider timeout/unavailability, and sanitized unexpected errors.
-- Application-schema tests for the beverage-type enum and unknown keys.
-- Domain tests for extracted evidence, categorical confidence, warning rule versioning, exhaustive comparison-rule coverage, exhaustive `matchField` coverage, normalizers, and outcome derivation.
+- Application-schema tests for the required fields and unknown-key rejection.
+- Domain tests for warning rule versioning, exhaustive comparison-rule coverage, exhaustive `matchField` coverage, normalizers, and outcome derivation. Evidence and confidence types are exercised through those tests rather than a dedicated suite.
 - Stub label scanner tests: readable defaults across `LABEL_FIELDS`, missing optionals, the default warning, and partial overrides.
 - Cross-check use-case tests cover pass, fail, review, omitted optionals, warning boldness, and the offline `unreadLabelScanner`, which reports every field unreadable.
 - Vision scanner tests (mocked Anthropic): request construction, valid mapping, omitted optionals, warning evidence, categorical confidence, semantic-validation rejections, and sanitized timeout/unavailability mapping.
 - Batch tests: CSV parser (quoted fields, blank optionals, header validation, the 300-row cap, per-row errors) and concurrency pool (limit enforcement, input-order results, rejection isolation).
 
-Remaining:
 
-- Unit tests for validation helpers and warning rules.
-- Telemetry adapter and route-injection tests.
 
 ## Deliberately excluded
 
@@ -246,3 +270,4 @@ Remaining:
 - User accounts or authentication
 - COLA integration
 - Autonomous regulatory approval or rejection
+

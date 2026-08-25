@@ -41,7 +41,6 @@ export function LabelVerificationForm() {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<VerificationResult | null>(null);
-  const [elapsedMs, setElapsedMs] = useState<number | null>(null);
 
   const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -49,7 +48,6 @@ export function LabelVerificationForm() {
     setPending(true);
     setError(null);
     setResult(null);
-    const startedAt = performance.now();
 
     // Trim every text entry and omit blank optional fields entirely.
     const applicationData = Object.fromEntries(
@@ -66,7 +64,6 @@ export function LabelVerificationForm() {
       const response = await fetch("/api/verifications", { method: "POST", body });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload?.error?.message || FALLBACK_ERROR);
-      setElapsedMs(performance.now() - startedAt);
       setResult(payload.data);
     } catch (caught) {
       setError(caught instanceof Error && caught.message ? caught.message : FALLBACK_ERROR);
@@ -149,7 +146,7 @@ export function LabelVerificationForm() {
             ) : null}
           </div>
           {/* Display the verification results */}
-          {result ? <VerificationResults result={result} elapsedMs={elapsedMs} /> : null}
+          {result ? <VerificationResults result={result} /> : null}
         </div>
       </form>
     </div>

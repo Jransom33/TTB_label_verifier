@@ -20,7 +20,7 @@ export type FieldMatch =
   | { field: LabelField; expected: string; evidence: JudgedField }
   | { field: "governmentWarning"; evidence: GovernmentWarningEvidence };
 
-// Assumption: these sentences are the public explanations; confirm the wording.
+
 const EXPLANATIONS: Record<FieldStatus, string | null> = {
   match: null,
   needs_review: "Values are equivalent but not identical.",
@@ -73,7 +73,6 @@ const matchText = ({
 
 /*
  * Check the government warning against the versioned TTB wording.
- * Assumption: expected/extracted join heading and body with one space.
  */
 const matchWarning = (evidence: GovernmentWarningEvidence): FieldResult => {
   const expected = `${GOVERNMENT_WARNING_RULE.heading} ${GOVERNMENT_WARNING_RULE.body}`;
@@ -123,7 +122,7 @@ const matchWarning = (evidence: GovernmentWarningEvidence): FieldResult => {
     );
   }
 
-  // Open question resolved: correct wording under a non-bold heading is mismatch.
+  // Correct wording under a non-bold heading is a mismatch.
   return result(
     headingIsBold.value ? "match" : "mismatch",
     extracted,
