@@ -6,6 +6,8 @@ It is decision support only: it never approves or rejects an application on its 
 
 **Live demo:** [https://ttb-label-verifier-eta.vercel.app/](https://ttb-label-verifier-eta.vercel.app/)
 
+<img src="docs/ui-screenshot.png" alt="Verifying a bundled example label: every field matches the application, so the overall result is pass" width="800">
+
 ## Quick start
 
 Requires Node.js 20.9+.
