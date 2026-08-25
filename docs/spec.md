@@ -37,7 +37,9 @@ These were confirmed during implementation:
 - Optional producer and country of origin are verified only when supplied.
 - Default image limit is 10 MB (`MAX_IMAGE_BYTES`). Default request limit is that value plus 1 MB (`MAX_REQUEST_BYTES`).
 - Health means application availability only, not provider readiness.
-- One image per verification request. Batch endpoints wait until sync vs async is confirmed.
+- One image per verification request. Batch verification is client-orchestrated: the browser pairs a CSV of application data with selected images and calls the single endpoint once per item, so no batch routes exist.
+- Batch CSV columns (any order): `imageFile`, `brandName`, `classType`, `alcoholContent`, `netContents`, `producer`, `countryOfOrigin`. Rows pair to images by exact filename, blank optional cells are omitted, and at most 300 data rows are accepted.
+- Client batch concurrency is 4. Retrying a failed item is idempotent because the server is stateless.
 - Confidence is categorical: `low`, `medium`, or `high`. Claude does not expose numeric scores; the adapter asks for these categories and validates the enum. The labels are model-reported, not calibrated thresholds.
 - Verification results do not include image-quality reasons; unreadable or uncertain fields carry their own status, confidence, and explanation.
 - The provider (LLM/Claude) judges each supplied field against its expected value and returns a `match` or `mismatch` verdict beside the text it read. Equivalence, including differing units and formats, is its call.
@@ -97,7 +99,7 @@ Done:
 - Configurable `MAX_IMAGE_BYTES` and `MAX_REQUEST_BYTES`; the body is read with a size cap before parsing.
 - Malformed or unsafe input is rejected before the use case (and later AI provider).
 
-### 4. HTTP controllers — adapter — complete for the single-item prototype
+### 4. HTTP controllers — adapter — complete
 
 Built early against the stub use case, which is what allowed the HTTP contract to be finished ahead of the rules.
 
@@ -108,10 +110,7 @@ Done:
 - `POST /api/verifications` parses the upload, assigns a request ID, calls the cross-check use case once, and returns the structured result or a sanitized error.
 - Controllers stay limited to HTTP: parse, request ID, use-case call, error mapping.
 - Endpoint contracts documented in `README.md`.
-
-Remaining:
-
-- Batch routes, after the workflow is confirmed.
+- No batch routes: batch processing is client-orchestrated over the single endpoint (component 14).
 
 ### 5. Error presenter — adapter — complete
 
@@ -209,9 +208,16 @@ Done:
 - The verification route is the measurement point. It times the whole request (`durationMs`) and wraps `scan` (`scanDurationMs`, including failures; `null` if parse failed first), then records on both success and failure. Failure codes come from `toApiErrorCode`, the same mapping the HTTP presenter uses.
 - Five seconds is the typical-result target (NFR-1), measured here. The provider abort timeout stays at 10s so a slower call can still complete.
 
-### 14. Cross-check batch — use case — not started
+### 14. Batch verification — client component — complete
 
-Remaining: bounded concurrency for up to 300 items, per-item isolation, progress/summary, and idempotent retries, calling component 11 once per item. Execution model is still unconfirmed.
+Moved out of the backend: the browser orchestrates up to 300 items against component 11 through the single verification endpoint, so no batch use case or routes exist and the server is unchanged.
+
+Done:
+
+- `components/parse-batch-csv.ts` parses the CSV with Papa Parse and validates every row with the domain application schema, returning valid items plus per-row errors by spreadsheet row number.
+- `components/run-with-concurrency.ts` bounds concurrency at 4 workers with order-preserving, independently settled results.
+- `components/batch-verification.tsx` pairs rows to selected images by exact filename, surfaces unmatched rows and unused images before running, shows per-item status with live progress and a pass/fail/review/error summary, and retries only failed items (idempotent, since the server is stateless).
+- The home page offers a Single / Batch mode toggle.
 
 ### Test coverage — not a sequenced component
 
@@ -227,12 +233,12 @@ Done:
 - Stub label scanner tests: readable defaults across `LABEL_FIELDS`, missing optionals, the default warning, and partial overrides.
 - Cross-check use-case tests cover pass, fail, review, omitted optionals, warning boldness, and the offline `unreadLabelScanner`, which reports every field unreadable.
 - Vision scanner tests (mocked Anthropic): request construction, valid mapping, omitted optionals, warning evidence, categorical confidence, semantic-validation rejections, and sanitized timeout/unavailability mapping.
+- Batch tests: CSV parser (quoted fields, blank optionals, header validation, the 300-row cap, per-row errors) and concurrency pool (limit enforcement, input-order results, rejection isolation).
 
 Remaining:
 
 - Unit tests for validation helpers and warning rules.
 - Telemetry adapter and route-injection tests.
-- Batch tests.
 
 ## Deliberately excluded
 

@@ -28,7 +28,7 @@ const STATUS_TONE: Record<FieldStatus | VerificationOutcome, string> = {
   unreadable: "bg-white/10 text-white/60",
 };
 
-const StatusBadge = ({ status }: { status: FieldStatus | VerificationOutcome }) => (
+export const StatusBadge = ({ status }: { status: FieldStatus | VerificationOutcome }) => (
   <span
     className={`rounded-full px-2.5 py-0.5 text-xs font-medium whitespace-nowrap ${STATUS_TONE[status]}`}
   >

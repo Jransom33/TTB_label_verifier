@@ -11,4 +11,4 @@ alwaysApply: false
  
 - Make sure to list the components in the order they should be implemented.
 
-- Describe the plan but make sure to talk like how a human software engineer would talk, simple but complete.
+- Describe the plan but make sure to talk like how a human software engineer would talk, simple and concise but complete.

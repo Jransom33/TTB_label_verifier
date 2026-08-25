@@ -18,7 +18,18 @@ Optional limits: `MAX_IMAGE_BYTES` (default 10 MB) and `MAX_REQUEST_BYTES` (defa
 
 ## API
 
-All JSON responses include `requestId`. The same value is returned in the `x-request-id` header. Batch endpoints are deferred until the synchronous versus asynchronous workflow is confirmed.
+All JSON responses include `requestId`. The same value is returned in the `x-request-id` header.
+
+There are no batch endpoints: batch verification is client-orchestrated. The home page's Batch CSV mode pairs a CSV of application data with selected label images by filename and calls `POST /api/verifications` once per item, four at a time, with per-item results, a progress summary, and retry of failed items only (safe, since the server is stateless).
+
+Batch CSV format — a header row with these columns in any order, then up to 300 data rows:
+
+```csv
+imageFile,brandName,classType,alcoholContent,netContents,producer,countryOfOrigin
+label.png,OLD TOM DISTILLERY,Kentucky Straight Bourbon Whiskey,45% Alc./Vol. (90 Proof),750 mL,"Old Tom Distilling Co., Bardstown, KY",United States
+```
+
+`imageFile` must exactly match the filename of a selected image. `producer` and `countryOfOrigin` are optional; blank cells are omitted. Invalid rows are reported by row number without blocking the rest.
 
 ### `GET /api/health`
 
